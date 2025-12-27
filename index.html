@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="style.css">
+    <title>AI Filtre Uygulamam</title>
+    <style>
+        body { text-align: center; font-family: sans-serif; background: #f0f0f0; }
+        video, canvas { border: 5px solid #333; border-radius: 10px; max-width: 90%; }
+        .controls { margin-top: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #007bff; color: white; margin: 5px; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Canli Görüntü İşleme</h1>
+    <video id="video" autoplay></video>
+    <div class="controls">
+        <button onclick="applyFilter('none')">Normal</button>
+        <button onclick="applyFilter('grayscale(100%)')">Siyah Beyaz</button>
+        <button onclick="applyFilter('sepia(100%)')">Sepya</button>
+        <button onclick="applyFilter('invert(100%)')">Negatif</button>
+        <button class="btn-capture" onclick="takePhoto()"> Fotoğrafi İndir</button>
+
+<canvas id="canvas" style="display:none;"></canvas>
+        <button onclick="applyFilter('blur(5px)')">Bulanik</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+
+        // Kamerayı Başlat
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+            });
+        }
+
+        function applyFilter(filterName) {
+            video.style.filter = filterName;
+        }
+    </script>
+</body>
+</html>

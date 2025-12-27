@@ -1,0 +1,91 @@
+/* style.css */
+
+/* 1. Sayfanın genel arka planı ve yerleşimi */
+body {
+    background-color: #0f172a; /* Derin lacivert/siyah arka plan */
+    color: #f8fafc; /* Beyazımsı yazı rengi */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+/* 2. Başlık stili */
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+    color: #38bdf8; /* Parlak mavi */
+    text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+}
+
+/* 3. Kamera kutusunun tasarımı */
+.video-box {
+    border: 4px solid #1e293b;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    background: #000;
+    line-height: 0; /* Boşlukları siler */
+}
+
+video {
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    transform: scaleX(-1); /* Kamerayı ayna gibi ters çevirir (daha doğal hissettirir) */
+}
+
+/* 4. Butonların bulunduğu grup */
+.button-group {
+    margin-top: 30px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 800px;
+}
+
+/* 5. Ortak Buton Tasarımı */
+button {
+    background: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+/* Butonun üzerine gelince (Hover) */
+button:hover {
+    background: #38bdf8;
+    color: #0f172a;
+    border-color: #38bdf8;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(56, 189, 248, 0.3);
+}
+
+/* Tıklandığında küçük bir basılma efekti */
+button:active {
+    transform: translateY(-1px);
+}
+.btn-capture {
+    background: #22c55e !important; /* Yeşil renk */
+    color: #fff !important;
+    width: 100%; /* Satırı kaplasın */
+    margin-top: 15px;
+    font-size: 1.1rem !important;
+    border-color: #16a34a !important;
+}
+
+.btn-capture:hover {
+    background: #16a34a !important;
+    box-shadow: 0 10px 20px rgba(34, 197, 94, 0.4) !important;
+}
