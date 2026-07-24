@@ -272,17 +272,43 @@ body {
     line-height: 1.4;
 }
 
+/* Galeri Butonları */
+.gallery-btn {
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+    outline: none;
+}
+
+.gallery-btn:hover {
+    border-color: var(--accent-primary);
+    background: rgba(122, 102, 246, 0.05);
+}
+
+.select-mode-btn.active {
+    background: var(--text-secondary);
+    color: #ffffff;
+    border-color: var(--text-secondary);
+}
+
 .photo-gallery {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 4px;
-    max-height: 200px;
+    max-height: 250px;
     overflow-y: auto;
+    padding-top: 4px;
 }
 
 .gallery-photo-item {
     position: relative;
-    aspect-ratio: 16/9;
+    aspect-ratio: 1/1; /* Kare formunda küçük görünüm */
     border-radius: var(--radius-sm);
     overflow: hidden;
     border: 1px solid var(--border-color);
@@ -293,6 +319,51 @@ body {
 .gallery-photo-item:hover {
     transform: scale(1.04);
     border-color: var(--accent-primary);
+}
+
+/* Seçim kutusu yuvarlağı */
+.gallery-photo-item .select-checkbox {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--text-muted);
+    display: none;
+    z-index: 12;
+}
+
+.gallery-photo-item.selection-active .select-checkbox {
+    display: block; /* Seçim modu aktifken tüm kartlarda boş daire görünsün */
+}
+
+.gallery-photo-item.selected .select-checkbox {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    display: block;
+}
+
+.gallery-photo-item.selected .select-checkbox::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 1px;
+    width: 3px;
+    height: 5px;
+    border: solid white;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.gallery-photo-item.selected {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+.gallery-photo-item.selected img {
+    filter: brightness(0.8);
 }
 
 .gallery-photo-item img {
@@ -657,6 +728,26 @@ body {
     font-size: 11px;
     font-weight: 500;
     color: var(--text-secondary);
+}
+
+.lightbox-download-btn {
+    background: var(--accent-primary);
+    color: #ffffff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    transition: var(--transition-fast);
+    box-shadow: 0 2px 6px rgba(122, 102, 246, 0.2);
+}
+
+.lightbox-download-btn:hover {
+    background: #5d46e2;
+    box-shadow: 0 4px 10px rgba(122, 102, 246, 0.35);
 }
 
 .lightbox-delete-btn {

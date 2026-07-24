@@ -29,11 +29,7 @@
                     <h4 class="section-title">Görüntü Filtreleri</h4>
                     <div class="filter-grid">
                         <button class="filter-btn active" data-filter="normal">Normal</button>
-                        <button class="filter-btn" data-filter="grayscale">Gri Ton</button>
-                        <button class="filter-btn" data-filter="sepia">Sepia</button>
-                        <button class="filter-btn" data-filter="invert">Negatif</button>
-                        <button class="filter-btn" data-filter="blur">Bulanık</button>
-                        <button class="filter-btn" data-filter="contrast">Kontrast</button>
+                        <button class="filter-btn" data-filter="grayscale">Siyah Beyaz</button>
                     </div>
                 </div>
 
@@ -98,7 +94,14 @@
 
                 <!-- 4. Galeri Kartı -->
                 <div class="sidebar-section gallery-section">
-                    <h4 class="section-title">Çekilen Fotoğraflar</h4>
+                    <div class="gallery-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h4 class="section-title" style="margin-bottom: 0;">Çekilen Fotoğraflar</h4>
+                        <div class="gallery-actions-wrapper" style="display: flex; gap: 4px;">
+                            <button class="gallery-btn select-mode-btn" id="select-mode-btn" title="Dosyaları Seç">Seç</button>
+                            <button class="gallery-btn batch-download-btn" id="batch-download-btn" style="display: none; background: var(--accent-primary); color: #fff;" title="Seçilenleri İndir">İndir (0)</button>
+                            <button class="gallery-btn batch-delete-btn" id="batch-delete-btn" style="display: none; background: #ff4d4d; color: #fff;" title="Seçilenleri Sil">Sil (0)</button>
+                        </div>
+                    </div>
                     <p class="gallery-info-text">
                         Kameraya karşı <strong>Başparmak Yukarı (👍)</strong> işareti yaptıktan <strong>2 saniye sonra</strong> çeker.
                     </p>
@@ -154,12 +157,7 @@
                     <span class="effects-title">Filtre Uygula:</span>
                     <div class="effects-toolbar">
                         <button class="effect-btn active" data-effect="normal">Orijinal</button>
-                        <button class="effect-btn" data-effect="grayscale">Gri Ton</button>
-                        <button class="effect-btn" data-effect="sepia">Sepia</button>
-                        <button class="effect-btn" data-effect="invert">Negatif</button>
-                        <button class="effect-btn" data-effect="blur">Bulanık</button>
-                        <button class="effect-btn" data-effect="warm">Sıcak</button>
-                        <button class="effect-btn" data-effect="cool">Soğuk</button>
+                        <button class="effect-btn" data-effect="grayscale">Siyah Beyaz</button>
                     </div>
                     <button class="save-effect-btn" id="save-effect-btn">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -169,10 +167,16 @@
 
                 <div class="lightbox-details">
                     <span class="lightbox-date" id="lightbox-date">Tarih: --/--/----</span>
-                    <button class="lightbox-delete-btn" id="lightbox-delete-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        Fotoğrafı Sil
-                    </button>
+                    <div class="lightbox-actions" style="display: flex; gap: 8px;">
+                        <button class="lightbox-download-btn" id="lightbox-download-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Fotoğrafı İndir
+                        </button>
+                        <button class="lightbox-delete-btn" id="lightbox-delete-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            Fotoğrafı Sil
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

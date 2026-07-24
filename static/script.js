@@ -38,24 +38,8 @@ document.addEventListener('DOMContentLoaded', function () {
         filterStr += `contrast(${settings.contrast}%) `;
 
         // Özel filtreler
-        switch (currentFilter) {
-            case 'grayscale':
-                filterStr += 'grayscale(100%) ';
-                break;
-            case 'sepia':
-                filterStr += 'sepia(80%) ';
-                break;
-            case 'invert':
-                filterStr += 'invert(100%) ';
-                break;
-            case 'blur':
-                filterStr += 'blur(4px) ';
-                break;
-            case 'contrast':
-                filterStr += 'contrast(150%) ';
-                break;
-            default:
-                break;
+        if (currentFilter === 'grayscale') {
+            filterStr += 'grayscale(100%) ';
         }
 
         videoStream.style.filter = filterStr.trim();
@@ -163,11 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Filtre kısayolları
         const shortcuts = {
             '1': 'normal',
-            '2': 'grayscale',
-            '3': 'sepia',
-            '4': 'invert',
-            '5': 'blur',
-            '6': 'contrast'
+            '2': 'grayscale'
         };
 
         if (shortcuts[e.key]) {
@@ -257,6 +237,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const lightboxDate = document.getElementById('lightbox-date');
     const lightboxDeleteBtn = document.getElementById('lightbox-delete-btn');
     const lightboxCloseBtn = document.getElementById('lightbox-close-btn');
+    const lightboxDownloadBtn = document.getElementById('lightbox-download-btn');
     const effectButtons = document.querySelectorAll('.effect-btn');
     const saveEffectBtn = document.getElementById('save-effect-btn');
     
@@ -306,7 +287,21 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Efekt Butonları Tıklama Takibi (Anlık CSS Filtre Önizleme)
+    // Fotoğrafı İndir Buton Takibi
+    if (lightboxDownloadBtn) {
+        lightboxDownloadBtn.addEventListener('click', () => {
+            if (activePhotoFilename) {
+                const link = document.createElement('a');
+                link.href = `/static/captured/${activePhotoFilename}`;
+                link.download = activePhotoFilename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+    }
+
+    // Efekt Butonları Tıklama Takibi (Anlık Siyah-Beyaz Önizleme)
     effectButtons.forEach(btn => {
         btn.addEventListener('click', function() {
             effectButtons.forEach(b => b.classList.remove('active'));
@@ -314,15 +309,10 @@ document.addEventListener('DOMContentLoaded', function () {
             
             activeEffect = this.getAttribute('data-effect');
             
-            // CSS Filtre önizlemelerini uygula
+            // Sadece Siyah Beyaz (grayscale) filtresini önizle
             let filterStr = 'none';
-            switch (activeEffect) {
-                case 'grayscale': filterStr = 'grayscale(100%)'; break;
-                case 'sepia': filterStr = 'sepia(80%)'; break;
-                case 'invert': filterStr = 'invert(100%)'; break;
-                case 'blur': filterStr = 'blur(4px)'; break;
-                case 'warm': filterStr = 'contrast(110%) saturate(120%) sepia(20%)'; break;
-                case 'cool': filterStr = 'contrast(105%) saturate(110%) hue-rotate(10deg)'; break;
+            if (activeEffect === 'grayscale') {
+                filterStr = 'grayscale(100%)';
             }
             lightboxImg.style.filter = filterStr;
         });
@@ -403,7 +393,108 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /**
-     * Galeriyi Yükle ve Oluştur
+     * Çoklu Seçim Modu ve Toplu İşlemler
+     */
+    let isSelectionMode = false;
+    let selectedPhotos = new Set();
+
+    const selectModeBtn = document.getElementById('select-mode-btn');
+    const batchDownloadBtn = document.getElementById('batch-download-btn');
+    const batchDeleteBtn = document.getElementById('batch-delete-btn');
+
+    function toggleSelectionMode() {
+        if (!selectModeBtn) return;
+        isSelectionMode = !isSelectionMode;
+        selectedPhotos.clear();
+
+        if (isSelectionMode) {
+            selectModeBtn.textContent = 'İptal';
+            selectModeBtn.classList.add('active');
+            if (batchDownloadBtn) batchDownloadBtn.style.display = 'inline-block';
+            if (batchDeleteBtn) batchDeleteBtn.style.display = 'inline-block';
+            updateBatchButtonStates();
+
+            document.querySelectorAll('.gallery-photo-item').forEach(item => {
+                item.classList.add('selection-active');
+            });
+        } else {
+            selectModeBtn.textContent = 'Seç';
+            selectModeBtn.classList.remove('active');
+            if (batchDownloadBtn) batchDownloadBtn.style.display = 'none';
+            if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
+
+            document.querySelectorAll('.gallery-photo-item').forEach(item => {
+                item.classList.remove('selection-active');
+                item.classList.remove('selected');
+            });
+        }
+    }
+
+    function updateBatchButtonStates() {
+        const count = selectedPhotos.size;
+        if (batchDownloadBtn) {
+            batchDownloadBtn.textContent = `İndir (${count})`;
+            batchDownloadBtn.disabled = count === 0;
+        }
+        if (batchDeleteBtn) {
+            batchDeleteBtn.textContent = `Sil (${count})`;
+            batchDeleteBtn.disabled = count === 0;
+        }
+    }
+
+    if (selectModeBtn) {
+        selectModeBtn.addEventListener('click', toggleSelectionMode);
+    }
+
+    if (batchDownloadBtn) {
+        batchDownloadBtn.addEventListener('click', () => {
+            if (selectedPhotos.size === 0) return;
+            selectedPhotos.forEach(filename => {
+                const link = document.createElement('a');
+                link.href = `/static/captured/${filename}`;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+            toggleSelectionMode();
+        });
+    }
+
+    if (batchDeleteBtn) {
+        batchDeleteBtn.addEventListener('click', async () => {
+            const count = selectedPhotos.size;
+            if (count === 0) return;
+            if (!confirm(`Seçilen ${count} fotoğrafı silmek istediğinize emin misiniz?`)) return;
+
+            batchDeleteBtn.disabled = true;
+            batchDeleteBtn.textContent = 'Siliniyor...';
+
+            try {
+                const response = await fetch('/delete_photos_batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filenames: Array.from(selectedPhotos) })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    toggleSelectionMode();
+                    loadPhotos(); // Galeriyi yenile
+                } else {
+                    alert('Toplu silme hatası: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Batch delete hatası:', error);
+                alert('Sunucu bağlantı hatası.');
+            } finally {
+                batchDeleteBtn.disabled = false;
+                updateBatchButtonStates();
+            }
+        });
+    }
+
+    /**
+     * Galeriyi Yükle ve Oluştur (Kompakt Kare Thumbnail & Seçim Modu Desteği)
      */
     async function loadPhotos() {
         const gallery = document.getElementById('photo-gallery');
@@ -416,31 +507,59 @@ document.addEventListener('DOMContentLoaded', function () {
             gallery.innerHTML = '';
 
             if (!data.photos || data.photos.length === 0) {
-                gallery.innerHTML = '<span class="no-photos-msg" style="color: var(--text-muted); font-size: 13px;">Henüz fotoğraf çekilmedi.</span>';
+                gallery.innerHTML = '<span class="no-photos-msg" style="color: var(--text-muted); font-size: 11px;">Henüz fotoğraf çekilmedi.</span>';
+                if (selectModeBtn) selectModeBtn.style.display = 'none';
                 return;
             }
+
+            if (selectModeBtn) selectModeBtn.style.display = 'inline-block';
 
             data.photos.forEach(photo => {
                 const item = document.createElement('div');
                 item.className = 'gallery-photo-item';
+                if (isSelectionMode) {
+                    item.className += ' selection-active';
+                    if (selectedPhotos.has(photo.filename)) {
+                        item.className += ' selected';
+                    }
+                }
                 item.setAttribute('data-url', photo.url);
+                item.setAttribute('data-filename', photo.filename);
                 item.innerHTML = `
                     <img src="${photo.url}" alt="Captured Photo">
+                    <span class="select-checkbox"></span>
                     <span class="gallery-photo-badge">Zamanlayıcı</span>
                     <button class="gallery-photo-delete-icon" title="Fotoğrafı Sil">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                 `;
 
-                // Fotoğrafa tıklayınca Lightbox aç
-                item.querySelector('img').addEventListener('click', () => {
-                    openLightbox(photo.url, photo.timestamp);
+                // Kart tıklandığında: Seçim modundaysa seç, değilse detay gör (Lightbox) aç
+                item.addEventListener('click', (e) => {
+                    if (isSelectionMode) {
+                        e.stopPropagation();
+                        if (selectedPhotos.has(photo.filename)) {
+                            selectedPhotos.delete(photo.filename);
+                            item.classList.remove('selected');
+                        } else {
+                            selectedPhotos.add(photo.filename);
+                            item.classList.add('selected');
+                        }
+                        updateBatchButtonStates();
+                    } else {
+                        // Trash can tıklandıysa lightbox açma
+                        if (!e.target.closest('.gallery-photo-delete-icon')) {
+                            openLightbox(photo.url, photo.timestamp);
+                        }
+                    }
                 });
 
-                // Silme butonuna tıklayınca direkt sil
+                // Silme butonuna tıklayınca direkt sil (Seçim modu kapalıyken)
                 item.querySelector('.gallery-photo-delete-icon').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    deletePhoto(photo.filename);
+                    if (!isSelectionMode) {
+                        deletePhoto(photo.filename);
+                    }
                 });
 
                 gallery.appendChild(item);

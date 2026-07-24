@@ -579,6 +579,44 @@ def delete_photo(filename):
             return {'status': 'error', 'message': f'Silme hatasi: {str(e)}'}, 500
     return {'status': 'error', 'message': 'Dosya bulunamadi'}, 404
 
+@app.route('/delete_photos_batch', methods=['POST'])
+def delete_photos_batch():
+    global latest_photo_url
+    data = request.json
+    filenames = data.get('filenames', [])
+    
+    if not filenames:
+        return {'status': 'error', 'message': 'Silinecek dosya secilmedi'}, 400
+        
+    deleted_count = 0
+    errors = []
+    
+    for filename in filenames:
+        if ".." in filename or "/" in filename or "\\" in filename:
+            errors.append(f"{filename}: Gecersiz dosya adi")
+            continue
+            
+        photo_path = os.path.join("static/captured", filename)
+        if os.path.exists(photo_path):
+            try:
+                os.remove(photo_path)
+                deleted_count += 1
+                if latest_photo_url and filename in latest_photo_url:
+                    latest_photo_url = None
+            except Exception as e:
+                errors.append(f"{filename}: {str(e)}")
+        else:
+            errors.append(f"{filename}: Dosya bulunamadi")
+            
+    if errors and deleted_count == 0:
+        return {'status': 'error', 'message': '; '.join(errors)}, 500
+        
+    return {
+        'status': 'success', 
+        'message': f'{deleted_count} fotograf silindi',
+        'errors': errors
+    }
+
 @app.route('/apply_filter_to_photo', methods=['POST'])
 def apply_filter_to_photo():
     data = request.json
@@ -665,4 +703,4 @@ if __name__ == '__main__':
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
         Timer(1.5, open_browser).start()
         
-    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False, threaded=True)
