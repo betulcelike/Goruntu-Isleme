@@ -6,6 +6,8 @@
     <title>El Takip Sistemi</title>
     <link rel="stylesheet" href="/static/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN Entegrasyonu -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Kamera Flaş Efekti -->
@@ -30,6 +32,37 @@
                     <div class="filter-grid">
                         <button class="filter-btn active" data-filter="normal">Normal</button>
                         <button class="filter-btn" data-filter="grayscale">Siyah Beyaz</button>
+                    </div>
+                </div>
+
+                <!-- 1b. AR Yüz Maskeleri -->
+                <div class="sidebar-section">
+                    <h4 class="section-title">AR Yüz Maskeleri</h4>
+                    <div class="filter-grid" id="mask-grid">
+                        <button class="mask-btn active" data-mask="none">Maske Yok</button>
+                        <button class="mask-btn" data-mask="glasses">Gözlük & Bıyık</button>
+                        <button class="mask-btn" data-mask="ears">Kedi Kulakları</button>
+                    </div>
+                </div>
+
+                <!-- 1c. Mimik Challenge Oyunu -->
+                <div class="sidebar-section game-section">
+                    <h4 class="section-title">Mimik Challenge Oyunu</h4>
+                    <div class="game-container">
+                        <button class="game-start-btn" id="game-start-btn">Oyunu Başlat</button>
+                        <div class="game-status-box" id="game-status-box" style="display: none;">
+                            <div class="game-target">Görev: <span id="game-target-val">--</span></div>
+                            <div class="game-timer">Süre: <span id="game-timer-val">5</span>s</div>
+                            <div class="game-score">Skor: <span id="game-score-val">0</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1d. Canlı Duygu Analiz Grafiği -->
+                <div class="sidebar-section chart-section">
+                    <h4 class="section-title">Canlı Duygu Analizi</h4>
+                    <div class="chart-container" style="position: relative; height: 110px; width: 100%;">
+                        <canvas id="expressionChart"></canvas>
                     </div>
                 </div>
 
@@ -126,8 +159,11 @@
             </div>
 
             <!-- Kamera Ekranı Wrapper (Tüm Kalan Alanı Doldurur) -->
-            <div class="camera-screen-container">
+            <div class="camera-screen-container" style="position: relative;">
                 <img id="video-stream" src="/video_feed" alt="Video Stream">
+                
+                <!-- Emoji Yağmuru Konteyneri -->
+                <div id="emoji-container" class="emoji-container"></div>
                 
                 <!-- Overlay Corners -->
                 <div class="video-overlay">

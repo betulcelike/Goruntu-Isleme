@@ -34,6 +34,13 @@ object_detector = None
 object_detector_ready = False
 detected_objects_summary = []
 
+# Yeni Eklenen Jest ve AR Maske Değişkenleri
+current_mask = "none"
+hand_x_history = []
+swipe_event = None
+swipe_time = 0.0
+zoom_factor = 1.0
+
 # Kare Atlama ve Performans Önbelleği (Lag Önleme)
 frame_counter = 0
 cached_faces = []
@@ -284,9 +291,25 @@ def process_frame(frame):
                         fy_min = max(0, int(min(y_coords)))
                         fy_max = min(h, int(max(y_coords)))
                         
+                        # Anahtar yüz koordinatlarını çıkar (Gözler, burun, dudak, alın)
+                        key_pts = {}
+                        indices = {
+                            'left_eye': 33,
+                            'right_eye': 263,
+                            'nose_tip': 1,
+                            'upper_lip': 164,
+                            'forehead': 10,
+                            'chin': 152
+                        }
+                        for key_name, idx in indices.items():
+                            if idx < len(face_lm):
+                                pt = face_lm[idx]
+                                key_pts[key_name] = (int(pt.x * w), int(pt.y * h))
+
                         new_cached_faces.append({
                             'bbox': (fx_min, fy_min, fx_max, fy_max),
-                            'label': f"Yuz #{face_idx+1}: {face_expr}"
+                            'label': f"Yuz #{face_idx+1}: {face_expr}",
+                            'key_pts': key_pts
                         })
                         
                 with process_lock:
@@ -296,12 +319,91 @@ def process_frame(frame):
             except Exception as e_face:
                 print(f"Yuz isleme hatasi: {e_face}")
         
-        # Önbellekteki yüz kutularını çiz
+        # Önbellekteki yüz kutularını çiz ve AR maskeleri ekle
         for face in cached_faces:
             fx_min, fy_min, fx_max, fy_max = face['bbox']
+            # İnce yüz takip kutusu çizimi
             cv2.rectangle(frame, (fx_min, fy_min), (fx_max, fy_max), (246, 102, 122), 1)
             cv2.putText(frame, face['label'], (fx_min, fy_min - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (246, 102, 122), 2)
+
+            # AR Maske Çizimi
+            if current_mask != 'none' and 'key_pts' in face:
+                pts = face['key_pts']
+                if 'left_eye' in pts and 'right_eye' in pts:
+                    lex, ley = pts['left_eye']
+                    rex, rey = pts['right_eye']
+                    
+                    # Gözler arası mesafe (maske boyutunu ayarlamak için)
+                    eye_dist = int(np.sqrt((rex - lex)**2 + (rey - ley)**2))
+                    if eye_dist < 10:
+                        eye_dist = 10
+                        
+                    if current_mask == 'glasses':
+                        # Neon Mor Gözlük
+                        r = int(eye_dist * 0.35)
+                        # Sol ve Sağ mercek (şeffaf mor dolgu)
+                        overlay = frame.copy()
+                        cv2.circle(overlay, (lex, ley), r, (246, 102, 122), -1)
+                        cv2.circle(overlay, (rex, rey), r, (246, 102, 122), -1)
+                        # Alfa harmanlama ile şeffaf cam efekti
+                        cv2.addWeighted(overlay, 0.4, frame, 0.6, 0, frame)
+                        
+                        # Gözlük çerçevesi ve kenarları (beyaz)
+                        cv2.circle(frame, (lex, ley), r, (255, 255, 255), 2)
+                        cv2.circle(frame, (rex, rey), r, (255, 255, 255), 2)
+                        # Gözlük köprüsü
+                        cv2.line(frame, (lex + r, ley), (rex - r, rey), (255, 255, 255), 3)
+                        # Kulak sapları
+                        cv2.line(frame, (lex - r, ley), (max(0, lex - int(r*1.5)), ley - int(r*0.2)), (255, 255, 255), 2)
+                        cv2.line(frame, (rex + r, rey), (min(w, rex + int(r*1.5)), rey - int(r*0.2)), (255, 255, 255), 2)
+                        
+                        # Komik Bıyık (Burun altı, üst dudak üstü)
+                        if 'upper_lip' in pts:
+                            ulx, uly = pts['upper_lip']
+                            # Sol bıyık yayı
+                            cv2.ellipse(frame, (ulx - int(eye_dist*0.18), uly - 2), (int(eye_dist*0.18), int(eye_dist*0.08)), 0, 0, 180, (20, 20, 20), -1)
+                            # Sağ bıyık yayı
+                            cv2.ellipse(frame, (ulx + int(eye_dist*0.18), uly - 2), (int(eye_dist*0.18), int(eye_dist*0.08)), 0, 0, 180, (20, 20, 20), -1)
+                            
+                    elif current_mask == 'ears':
+                        # Kedi Kulakları
+                        if 'forehead' in pts:
+                            fhx, fhy = pts['forehead']
+                            ear_w = int(eye_dist * 0.4)
+                            ear_h = int(eye_dist * 0.5)
+                            
+                            # Sol Kulak (Neon pembe dış, beyaz iç üçgen)
+                            l_ear_base_left = (fhx - int(eye_dist*0.4), fhy)
+                            l_ear_base_right = (fhx - int(eye_dist*0.05), fhy)
+                            l_ear_tip = (fhx - int(eye_dist*0.3), fhy - ear_h)
+                            
+                            pts_l_ear = np.array([l_ear_base_left, l_ear_base_right, l_ear_tip], np.int32)
+                            cv2.fillPoly(frame, [pts_l_ear], (246, 102, 122))
+                            
+                            l_inner_tip = (fhx - int(eye_dist*0.3), fhy - int(ear_h*0.7))
+                            pts_l_inner = np.array([
+                                (l_ear_base_left[0] + int(ear_w*0.25), l_ear_base_left[1]),
+                                (l_ear_base_right[0] - int(ear_w*0.25), l_ear_base_right[1]),
+                                l_inner_tip
+                            ], np.int32)
+                            cv2.fillPoly(frame, [pts_l_inner], (255, 255, 255))
+                            
+                            # Sağ Kulak
+                            r_ear_base_left = (fhx + int(eye_dist*0.05), fhy)
+                            r_ear_base_right = (fhx + int(eye_dist*0.4), fhy)
+                            r_ear_tip = (fhx + int(eye_dist*0.3), fhy - ear_h)
+                            
+                            pts_r_ear = np.array([r_ear_base_left, r_ear_base_right, r_ear_tip], np.int32)
+                            cv2.fillPoly(frame, [pts_r_ear], (246, 102, 122))
+                            
+                            r_inner_tip = (fhx + int(eye_dist*0.3), fhy - int(ear_h*0.7))
+                            pts_r_inner = np.array([
+                                (r_ear_base_left[0] + int(ear_w*0.25), r_ear_base_left[1]),
+                                (r_ear_base_right[0] - int(ear_w*0.25), r_ear_base_right[1]),
+                                r_inner_tip
+                            ], np.int32)
+                            cv2.fillPoly(frame, [pts_r_inner], (255, 255, 255))
 
     # 2. El Algılama (Her 2 karede bir model çalışır, diğerlerinde önbellek kullanılır)
     if frame_counter % 2 == 0 or not cached_hands:
@@ -429,6 +531,60 @@ def process_frame(frame):
                     is_thumbs_up = True
                     break
                     
+    # Jest Algılama (Pinch-to-Zoom ve Swipe)
+    global hand_x_history, swipe_event, swipe_time, zoom_factor
+    current_time = time.time()
+    
+    # 1.5 saniye geçtikten sonra swipe event'ini temizle
+    if swipe_event and current_time - swipe_time > 1.5:
+        swipe_event = None
+        
+    if hands:
+        # İlk elin koordinatlarına göre jest algıla
+        hand = hands[0]
+        landmarks = hand.get('landmarks_px', [])
+        if len(landmarks) >= 21:
+            # 1. Zoom (Pinch) Tespiti
+            t_x, t_y = landmarks[4]
+            i_x, i_y = landmarks[8]
+            pinch_dist = np.sqrt((t_x - i_x)**2 + (t_y - i_y)**2)
+            
+            # El ölçeği (Bilek 0 ile Orta parmak eklemi 9 arası)
+            w_x, w_y = landmarks[0]
+            m_x, m_y = landmarks[9]
+            hand_scale = np.sqrt((w_x - m_x)**2 + (w_y - m_y)**2)
+            
+            if hand_scale > 10:
+                norm_dist = pinch_dist / hand_scale
+                # Eğer norm_dist çok küçükse zoom artır (pinch), genişse zoom azalt (spread)
+                if norm_dist < 0.28:
+                    zoom_factor = min(2.0, zoom_factor + 0.04)
+                elif norm_dist > 0.85:
+                    zoom_factor = max(1.0, zoom_factor - 0.04)
+            
+            # 2. Swipe Tespiti (Orta parmak ekleminin X hareketi)
+            cx = landmarks[9][0]
+            hand_x_history.append((cx, current_time))
+            # Son 0.4 saniye verilerini koru
+            hand_x_history = [p for p in hand_x_history if current_time - p[1] < 0.4]
+            
+            if len(hand_x_history) >= 5:
+                dx = hand_x_history[-1][0] - hand_x_history[0][0]
+                dt = hand_x_history[-1][1] - hand_x_history[0][1]
+                if dt > 0.08:
+                    speed = dx / dt
+                    if abs(speed) > 1000:
+                        if speed > 1000:
+                            swipe_event = "right"
+                        else:
+                            swipe_event = "left"
+                        swipe_time = current_time
+                        hand_x_history.clear()
+    else:
+        # El algılanmadığında yakınlaştırmayı yavaşça normale döndür
+        if zoom_factor > 1.0:
+            zoom_factor = max(1.0, zoom_factor - 0.03)
+
     with process_lock:
         global thumbs_up_active, live_hand_count, live_total_fingers, live_hand_types
         thumbs_up_active = is_thumbs_up
@@ -536,8 +692,22 @@ def stats():
         'hand_count': live_hand_count,
         'total_fingers': live_total_fingers,
         'hand_types': live_hand_types,
-        'face_count': live_face_count
+        'face_count': live_face_count,
+        'current_mask': current_mask,
+        'zoom_factor': round(zoom_factor, 2),
+        'swipe_event': swipe_event,
+        'swipe_timestamp': int(swipe_time * 1000)
     }
+
+@app.route('/select_mask', methods=['POST'])
+def select_mask():
+    global current_mask
+    data = request.json
+    mask = data.get('mask', 'none')
+    if mask in ['none', 'glasses', 'ears']:
+        current_mask = mask
+        return {'status': 'success', 'mask': current_mask}
+    return {'status': 'error', 'message': 'Geçersiz maske'}, 400
 
 @app.route('/capture_now', methods=['POST'])
 def capture_now():

@@ -24,6 +24,28 @@ document.addEventListener('DOMContentLoaded', function () {
         contrast: 100
     };
 
+    // AR Maske Butonları
+    const maskButtons = document.querySelectorAll('.mask-btn');
+    
+    // Canlı Grafik Değişkenleri
+    let expressionChart = null;
+    const expressionCounts = { 'Normal': 0, 'Mutlu': 0, 'Saskin': 0, 'Uzgun': 0 };
+
+    // Mimik Challenge Oyunu Değişkenleri
+    let gameActive = false;
+    let gameScore = 0;
+    let gameTarget = null;
+    let gameTimeLeft = 5;
+    let gameInterval = null;
+    const gameStartBtn = document.getElementById('game-start-btn');
+    const gameStatusBox = document.getElementById('game-status-box');
+    const gameTargetVal = document.getElementById('game-target-val');
+    const gameTimerVal = document.getElementById('game-timer-val');
+    const gameScoreVal = document.getElementById('game-score-val');
+
+    // Jest takip değişkenleri
+    let lastProcessedSwipeTime = 0;
+
 
 
     /**
@@ -118,6 +140,194 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // FPS sayacını başlat
     updateFPS();
+
+    /* ===============================================
+       Canlı Duygu Analiz Grafiği (Chart.js)
+       =============================================== */
+    function initChart() {
+        const ctx = document.getElementById('expressionChart');
+        if (!ctx) return;
+        expressionChart = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Normal', 'Mutlu', 'Şaşkın', 'Üzgün'],
+                datasets: [{
+                    label: 'Duygu Dağılımı',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#8b85a3', '#7a66f6', '#ffaa00', '#ff4d4d'],
+                    borderWidth: 0,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#8b85a3', font: { size: 9 } },
+                        grid: { display: false }
+                    },
+                    y: {
+                        ticks: { color: '#1e1b2b', font: { size: 9, weight: 'bold' } },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+    initChart();
+
+    /* ===============================================
+       AR Yüz Maskesi Seçim Yönetimi
+       =============================================== */
+    maskButtons.forEach(btn => {
+        btn.addEventListener('click', async function () {
+            maskButtons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const selectedMask = this.dataset.mask;
+            try {
+                await fetch('/select_mask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mask: selectedMask })
+                });
+            } catch (err) {
+                console.error('Maske seçilemedi:', err);
+            }
+        });
+    });
+
+    /* ===============================================
+       Emoji Yağmuru (Emoji Rain) Animasyonu
+       =============================================== */
+    function triggerEmojiRain() {
+        const container = document.getElementById('emoji-container');
+        if (!container) return;
+        
+        const emojis = ['😄', '😊', '❤️', '🎉', '✨', '👍', '🌸', '🥳'];
+        const count = 8;
+        for (let i = 0; i < count; i++) {
+            const emojiEl = document.createElement('span');
+            emojiEl.className = 'floating-emoji';
+            emojiEl.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            
+            emojiEl.style.left = (Math.random() * 90 + 5) + '%';
+            emojiEl.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
+            emojiEl.style.fontSize = (24 + Math.random() * 16) + 'px';
+            
+            container.appendChild(emojiEl);
+            setTimeout(() => {
+                emojiEl.remove();
+            }, 3000);
+        }
+    }
+
+    /* ===============================================
+       Mimik Challenge Oyunu Mantığı
+       =============================================== */
+    const gameChallenges = [
+        { label: 'Gülümse! 😊 (Mutlu Yüz)', check: (data) => data.face_expression === 'Mutlu' },
+        { label: 'Şaşır! 😲 (Şaşkın Yüz)', check: (data) => data.face_expression === 'Saskin' },
+        { label: 'Üzgün Yüz Yap! 😢', check: (data) => data.face_expression === 'Uzgun' },
+        { label: 'Normal İfadeye Dön 😐', check: (data) => data.face_expression === 'Normal' },
+        { label: 'Kameraya 2 El Göster! 🖐️🖐️', check: (data) => data.hand_count === 2 },
+        { label: 'Kameraya Tek El Göster! 🖐️', check: (data) => data.hand_count === 1 },
+        { label: 'Kameraya 5 Parmak Göster! 🖐️', check: (data) => data.total_fingers === 5 },
+        { label: 'Başparmak Kaldır! 👍', check: (data) => data.thumbs_up_detected }
+    ];
+
+    function startNewChallenge() {
+        let newChallenge;
+        do {
+            newChallenge = gameChallenges[Math.floor(Math.random() * gameChallenges.length)];
+        } while (newChallenge === gameTarget && gameChallenges.length > 1);
+        
+        gameTarget = newChallenge;
+        gameTimeLeft = 5;
+        if (gameTargetVal) gameTargetVal.textContent = gameTarget.label;
+        if (gameTimerVal) gameTimerVal.textContent = gameTimeLeft;
+    }
+
+    function toggleGame() {
+        if (!gameStartBtn) return;
+        gameActive = !gameActive;
+        
+        if (gameActive) {
+            gameStartBtn.textContent = 'Oyunu Durdur';
+            gameStartBtn.classList.add('active');
+            if (gameStatusBox) gameStatusBox.style.display = 'flex';
+            
+            gameScore = 0;
+            if (gameScoreVal) gameScoreVal.textContent = gameScore;
+            
+            startNewChallenge();
+            
+            gameInterval = setInterval(() => {
+                gameTimeLeft--;
+                if (gameTimerVal) gameTimerVal.textContent = gameTimeLeft;
+                
+                if (gameTimeLeft <= 0) {
+                    flashCameraViewport('red');
+                    startNewChallenge();
+                }
+            }, 1000);
+        } else {
+            gameStartBtn.textContent = 'Oyunu Başlat';
+            gameStartBtn.classList.remove('active');
+            if (gameStatusBox) gameStatusBox.style.display = 'none';
+            if (gameInterval) {
+                clearInterval(gameInterval);
+                gameInterval = null;
+            }
+            gameTarget = null;
+        }
+    }
+
+    if (gameStartBtn) {
+        gameStartBtn.addEventListener('click', toggleGame);
+    }
+
+    function flashCameraViewport(color) {
+        const streamContainer = document.querySelector('.camera-screen-container');
+        if (!streamContainer) return;
+        
+        const flashOverlay = document.createElement('div');
+        flashOverlay.style.position = 'absolute';
+        flashOverlay.style.top = '0';
+        flashOverlay.style.left = '0';
+        flashOverlay.style.width = '100%';
+        flashOverlay.style.height = '100%';
+        flashOverlay.style.pointerEvents = 'none';
+        flashOverlay.style.zIndex = '5';
+        
+        if (color === 'green') {
+            flashOverlay.style.background = 'rgba(16, 185, 129, 0.25)';
+            flashOverlay.style.border = '4px solid #10b981';
+        } else {
+            flashOverlay.style.background = 'rgba(239, 68, 68, 0.25)';
+            flashOverlay.style.border = '4px solid #ef4444';
+        }
+        
+        flashOverlay.style.borderRadius = 'var(--radius-lg)';
+        flashOverlay.style.transition = 'opacity 0.4s ease';
+        
+        streamContainer.appendChild(flashOverlay);
+        
+        setTimeout(() => {
+            flashOverlay.style.opacity = '0';
+            setTimeout(() => {
+                flashOverlay.remove();
+            }, 400);
+        }, 150);
+    }
+
 
     /**
      * Video stream hata yönetimi
@@ -614,6 +824,74 @@ document.addEventListener('DOMContentLoaded', function () {
             // Başparmak Yukarı (👍) Hareketi algılandıysa geri sayımı başlat
             if (data.thumbs_up_detected) {
                 startCountdown();
+            }
+
+            /* ===============================================
+               Canlı Grafik Güncelleme (Duygu Sayacı)
+               =============================================== */
+            if (expressionChart) {
+                const currentExpr = data.face_expression || 'Normal';
+                let key = 'Normal';
+                if (currentExpr === 'Mutlu' || currentExpr === 'Happy') {
+                    key = 'Mutlu';
+                    // Mutlu ifadesinde Emoji Yağmurunu tetikle
+                    triggerEmojiRain();
+                } else if (currentExpr === 'Saskin' || currentExpr === 'Surprised') {
+                    key = 'Saskin';
+                } else if (currentExpr === 'Uzgun' || currentExpr === 'Sad') {
+                    key = 'Uzgun';
+                }
+                
+                expressionCounts[key]++;
+                expressionChart.data.datasets[0].data = [
+                    expressionCounts['Normal'],
+                    expressionCounts['Mutlu'],
+                    expressionCounts['Saskin'],
+                    expressionCounts['Uzgun']
+                ];
+                expressionChart.update();
+            }
+
+            /* ===============================================
+               Mimik Oyunu Kontrol Mantığı
+               =============================================== */
+            if (gameActive && gameTarget) {
+                // Görevin yerine getirilip getirilmediğini kontrol et
+                const success = gameTarget.check(data);
+                if (success) {
+                    flashCameraViewport('green');
+                    gameScore++;
+                    if (gameScoreVal) gameScoreVal.textContent = gameScore;
+                    startNewChallenge();
+                }
+            }
+
+            /* ===============================================
+               Temassız Zoom Kontrolü (Pinch-to-Zoom CSS)
+               =============================================== */
+            if (data.zoom_factor !== undefined && videoStream) {
+                videoStream.style.transition = 'transform 0.15s ease-out';
+                videoStream.style.transform = `scale(${data.zoom_factor})`;
+            }
+
+            /* ===============================================
+               Temassız Swipe Kontrolü (Filtre Değiştirme)
+               =============================================== */
+            if (data.swipe_event && data.swipe_timestamp > lastProcessedSwipeTime) {
+                lastProcessedSwipeTime = data.swipe_timestamp;
+                const activeBtn = document.querySelector('.filter-btn.active');
+                if (activeBtn) {
+                    const btnsArray = Array.from(filterButtons);
+                    let currIdx = btnsArray.indexOf(activeBtn);
+                    
+                    if (data.swipe_event === 'right') {
+                        currIdx = (currIdx + 1) % btnsArray.length;
+                    } else if (data.swipe_event === 'left') {
+                        currIdx = (currIdx - 1 + btnsArray.length) % btnsArray.length;
+                    }
+                    
+                    btnsArray[currIdx].click();
+                }
             }
         } catch (error) {
             console.log('Stats güncellenemedi');
