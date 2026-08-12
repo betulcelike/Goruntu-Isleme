@@ -3,216 +3,368 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>El Takip Sistemi</title>
+    <title>GestureFlow AI — Vision Studio</title>
+    <!-- Modern Typography: Inter & SF Pro style -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Chart.js CDN Entegrasyonu -->
+    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <!-- Kamera Flaş Efekti -->
+    <!-- Shutter Flash Effect -->
     <div id="shutter-flash" class="shutter-flash"></div>
 
-    <div class="app-layout">
-        <!-- Sol Seçenekler Paneli (Kalıcı Olarak Görünür) -->
-        <aside class="sidebar-panel">
-            <!-- Logo -->
-            <div class="sidebar-logo">
-                <span class="logo-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5" /><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6" /><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" /><path d="M6 14v-1.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v1.5" /><path d="M18 15v3a6 6 0 0 1-6 6h-2a8 8 0 0 1-8-8v-3" /></svg>
-                </span>
-                <span class="logo-text">HandTrack</span>
-            </div>
-
-            <!-- Kaydırılabilir İçerik Alanı -->
-            <div class="sidebar-content">
-                <!-- 1. Görüntü Filtreleri -->
-                <div class="sidebar-section">
-                    <h4 class="section-title">Görüntü Filtreleri</h4>
-                    <div class="filter-grid">
-                        <button class="filter-btn active" data-filter="normal">Normal</button>
-                        <button class="filter-btn" data-filter="grayscale">Siyah Beyaz</button>
-                    </div>
+    <div class="vision-app">
+        <!-- Top Sleek Header -->
+        <header class="vision-header">
+            <div class="header-brand">
+                <div class="brand-badge">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="M12 3v18"></path>
+                        <path d="M3 12h18"></path>
+                        <circle cx="12" cy="12" r="4" fill="currentColor"></circle>
+                    </svg>
                 </div>
-
-                <!-- 1b. AR Yüz Maskeleri -->
-                <div class="sidebar-section">
-                    <h4 class="section-title">AR Yüz Maskeleri</h4>
-                    <div class="filter-grid" id="mask-grid">
-                        <button class="mask-btn active" data-mask="none">Maske Yok</button>
-                        <button class="mask-btn" data-mask="glasses">Gözlük & Bıyık</button>
-                        <button class="mask-btn" data-mask="ears">Kedi Kulakları</button>
-                    </div>
-                </div>
-
-                <!-- 1c. Mimik Challenge Oyunu -->
-                <div class="sidebar-section game-section">
-                    <h4 class="section-title">Mimik Challenge Oyunu</h4>
-                    <div class="game-container">
-                        <button class="game-start-btn" id="game-start-btn">Oyunu Başlat</button>
-                        <div class="game-status-box" id="game-status-box" style="display: none;">
-                            <div class="game-target">Görev: <span id="game-target-val">--</span></div>
-                            <div class="game-timer">Süre: <span id="game-timer-val">5</span>s</div>
-                            <div class="game-score">Skor: <span id="game-score-val">0</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 1d. Canlı Duygu Analiz Grafiği -->
-                <div class="sidebar-section chart-section">
-                    <h4 class="section-title">Canlı Duygu Analizi</h4>
-                    <div class="chart-container" style="position: relative; height: 110px; width: 100%;">
-                        <canvas id="expressionChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- 2. Kamera Ayarları -->
-                <div class="sidebar-section">
-                    <h4 class="section-title">Kamera Ayarları</h4>
-                    <div class="slider-group">
-                        <label>Parlaklık</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="brightness" min="50" max="150" value="100">
-                            <span class="slider-value" id="brightness-value">100%</span>
-                        </div>
-                    </div>
-                    <div class="sidebar-divider"></div>
-                    <div class="slider-group">
-                        <label>Doygunluk</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="saturation" min="0" max="200" value="100">
-                            <span class="slider-value" id="saturation-value">100%</span>
-                        </div>
-                    </div>
-                    <div class="sidebar-divider"></div>
-                    <div class="slider-group">
-                        <label>Kontrast</label>
-                        <div class="slider-wrapper">
-                            <input type="range" id="contrast" min="50" max="150" value="100">
-                            <span class="slider-value" id="contrast-value">100%</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 3. Canlı Takip İstatistikleri -->
-                <div class="sidebar-section">
-                    <h4 class="section-title">Canlı Takip Bilgisi</h4>
-                    <div class="stats-grid">
-                        <div class="stat-box">
-                            <span class="stat-label">Aktif El Sayısı</span>
-                            <span class="stat-val" id="live-hands-val">0</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-label">Açık Parmak</span>
-                            <span class="stat-val" id="live-fingers-val">0</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-label">Algılanan El</span>
-                            <span class="stat-val" id="live-hand-type-val">Hiçbiri</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-label">Aktif Yüz Sayısı</span>
-                            <span class="stat-val" id="live-faces-val">0</span>
-                        </div>
-                        <div class="stat-box full-width">
-                            <span class="stat-label">Yüz İfadesi</span>
-                            <span class="stat-val highlight" id="live-expression-val">Normal</span>
-                        </div>
-                        <div class="stat-box full-width flex-col">
-                            <span class="stat-label">Algılanan Nesneler</span>
-                            <span class="stat-val highlight scrollable" id="detected-objects-val">Hiçbiri</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. Galeri Kartı -->
-                <div class="sidebar-section gallery-section">
-                    <div class="gallery-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <h4 class="section-title" style="margin-bottom: 0;">Çekilen Fotoğraflar</h4>
-                        <div class="gallery-actions-wrapper" style="display: flex; gap: 4px;">
-                            <button class="gallery-btn select-mode-btn" id="select-mode-btn" title="Dosyaları Seç">Seç</button>
-                            <button class="gallery-btn batch-download-btn" id="batch-download-btn" style="display: none; background: var(--accent-primary); color: #fff;" title="Seçilenleri İndir">İndir (0)</button>
-                            <button class="gallery-btn batch-delete-btn" id="batch-delete-btn" style="display: none; background: #ff4d4d; color: #fff;" title="Seçilenleri Sil">Sil (0)</button>
-                        </div>
-                    </div>
-                    <p class="gallery-info-text">
-                        Kameraya karşı <strong>Başparmak Yukarı (👍)</strong> işareti yaptıktan <strong>2 saniye sonra</strong> çeker.
-                    </p>
-                    <div class="photo-gallery" id="photo-gallery">
-                        <span class="no-photos-msg">Henüz fotoğraf çekilmedi.</span>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Sağ Geniş Kamera Alanı -->
-        <main class="camera-viewport">
-            <!-- Üst Yüzen Meta Bilgi Çubuğu -->
-            <div class="camera-header">
-                <div class="system-status">
-                    <span class="status-dot"></span>
-                    <span>Canlı Akış</span>
-                </div>
-                <div class="camera-meta">
-                    <span id="fps-value" class="fps-badge">30</span> FPS
+                <div class="brand-titles">
+                    <h1 class="brand-name">GestureFlow <span class="brand-ai">AI</span></h1>
+                    <span class="brand-subtitle">Vision Intelligence Studio</span>
                 </div>
             </div>
 
-            <!-- Kamera Ekranı Wrapper (Tüm Kalan Alanı Doldurur) -->
-            <div class="camera-screen-container" style="position: relative;">
-                <img id="video-stream" src="/video_feed" alt="Video Stream">
+            <div class="header-center">
+                <div class="camera-pill">
+                    <span class="pulse-dot"></span>
+                    <span class="pill-text">Live Stream &bull; Primary Camera</span>
+                    <span class="feed-badge">1080p</span>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div class="meta-stat">
+                    <span class="meta-label">FPS</span>
+                    <span class="meta-val" id="fps-value">30</span>
+                </div>
+                <div class="meta-stat">
+                    <span class="meta-label">DURUM</span>
+                    <span class="meta-val active-status">ONLINE</span>
+                </div>
+                <div class="user-avatar" title="Stüdyo Aktif">
+                    <span>AI</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace Layout -->
+        <div class="workspace-grid">
+            <!-- Left Studio Sidebar -->
+            <aside class="studio-sidebar">
+                <div class="sidebar-scroll-area">
+                    
+                    <!-- 1. Modül: Kamera & Filtreler (Camera Tuning) -->
+                    <div class="studio-card accordion-card active" data-section="camera">
+                        <div class="card-header">
+                            <div class="header-title-group">
+                                <svg class="card-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                                <span>Kamera & Görüntü</span>
+                            </div>
+                            <span class="accordion-arrow">&#9662;</span>
+                        </div>
+                        <div class="card-content">
+                            <!-- Filtre Seçiciler -->
+                            <div class="pill-group">
+                                <label class="sub-label">Görüntü Filtresi</label>
+                                <div class="filter-pills">
+                                    <button class="filter-btn active" data-filter="normal">Orijinal</button>
+                                    <button class="filter-btn" data-filter="grayscale">Siyah Beyaz</button>
+                                </div>
+                            </div>
+
+                            <div class="divider"></div>
+
+                            <!-- Slider Ayarları -->
+                            <div class="slider-control">
+                                <div class="slider-meta">
+                                    <span>Parlaklık</span>
+                                    <span class="slider-num" id="brightness-value">100%</span>
+                                </div>
+                                <input type="range" id="brightness" min="50" max="150" value="100" class="apple-slider">
+                            </div>
+
+                            <div class="slider-control">
+                                <div class="slider-meta">
+                                    <span>Doygunluk</span>
+                                    <span class="slider-num" id="saturation-value">100%</span>
+                                </div>
+                                <input type="range" id="saturation" min="0" max="200" value="100" class="apple-slider">
+                            </div>
+
+                            <div class="slider-control">
+                                <div class="slider-meta">
+                                    <span>Kontrast</span>
+                                    <span class="slider-num" id="contrast-value">100%</span>
+                                </div>
+                                <input type="range" id="contrast" min="50" max="150" value="100" class="apple-slider">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Modül: Sinematik Stüdyo Renkleri (Color Grading) -->
+                    <div class="studio-card accordion-card active" data-section="grading">
+                        <div class="card-header">
+                            <div class="header-title-group">
+                                <svg class="card-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 0 0 20z"></path></svg>
+                                <span>Sinematik Işık & Renk</span>
+                            </div>
+                            <span class="accordion-arrow">&#9662;</span>
+                        </div>
+                        <div class="card-content">
+                            <div class="grading-options-grid">
+                                <button class="filter-preset-btn active" data-preset="natural">
+                                    <span class="preset-dot" style="background: #a1a1a6;"></span>
+                                    <span class="preset-label">Doğal HD</span>
+                                </button>
+                                <button class="filter-preset-btn" data-preset="studio_glow">
+                                    <span class="preset-dot" style="background: #ffd60a; box-shadow: 0 0 8px #ffd60a;"></span>
+                                    <span class="preset-label">Studio Glow</span>
+                                </button>
+                                <button class="filter-preset-btn" data-preset="warm_cinema">
+                                    <span class="preset-dot" style="background: #ff9f0a;"></span>
+                                    <span class="preset-label">Sıcak Sinema</span>
+                                </button>
+                                <button class="filter-preset-btn" data-preset="cyber_cyan">
+                                    <span class="preset-dot" style="background: #64d2ff; box-shadow: 0 0 8px #64d2ff;"></span>
+                                    <span class="preset-label">Siber Cyan</span>
+                                </button>
+                                <button class="filter-preset-btn" data-preset="dramatic_bw">
+                                    <span class="preset-dot" style="background: #ffffff;"></span>
+                                    <span class="preset-label">Dramatik B&W</span>
+                                </button>
+                                <button class="filter-preset-btn" data-preset="vivid_pop">
+                                    <span class="preset-dot" style="background: #bf5af2;"></span>
+                                    <span class="preset-label">Canlı Pop</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Modül: Mimik Challenge Oyunu (Gesture Game) -->
+                    <div class="studio-card accordion-card active" data-section="game">
+                        <div class="card-header">
+                            <div class="header-title-group">
+                                <svg class="card-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+                                <span>Mimik Challenge</span>
+                            </div>
+                            <span class="accordion-arrow">&#9662;</span>
+                        </div>
+                        <div class="card-content">
+                            <button class="apple-btn-primary" id="game-start-btn">
+                                <span>Oyunu Başlat</span>
+                            </button>
+                            
+                            <div class="game-hud-box" id="game-status-box" style="display: none;">
+                                <div class="hud-target-row">
+                                    <span class="hud-tag">GÖREV</span>
+                                    <span class="hud-target-text" id="game-target-val">--</span>
+                                </div>
+                                <div class="hud-metrics-row">
+                                    <div class="hud-stat">
+                                        <span class="hud-stat-title">Kalan Süre</span>
+                                        <span class="hud-stat-num highlight-yellow"><span id="game-timer-val">5</span>s</span>
+                                    </div>
+                                    <div class="hud-stat">
+                                        <span class="hud-stat-title">Puan</span>
+                                        <span class="hud-stat-num highlight-green" id="game-score-val">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Modül: Canlı Duygu Telemetrisi (Emotion Telemetry) -->
+                    <div class="studio-card accordion-card active" data-section="chart">
+                        <div class="card-header">
+                            <div class="header-title-group">
+                                <svg class="card-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                                <span>Duygu Analiz Grafiği</span>
+                            </div>
+                            <span class="accordion-arrow">&#9662;</span>
+                        </div>
+                        <div class="card-content">
+                            <div class="chart-wrapper">
+                                <canvas id="expressionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </aside>
+
+            <!-- Center & Right Studio Canvas -->
+            <main class="studio-canvas">
                 
-                <!-- Emoji Yağmuru Konteyneri -->
-                <div id="emoji-container" class="emoji-container"></div>
-                
-                <!-- Overlay Corners -->
-                <div class="video-overlay">
-                    <div class="corner top-left"></div>
-                    <div class="corner top-right"></div>
-                    <div class="corner bottom-left"></div>
-                    <div class="corner bottom-right"></div>
-                </div>
+                <!-- 1. Canlı Kamera Sahnesi (Studio Stream Screen) -->
+                <section class="camera-stage">
+                    <div class="stage-frame">
+                        <img id="video-stream" src="/video_feed" alt="Video Stream">
+                        
+                        <!-- Emoji Rain Layer -->
+                        <div id="emoji-container" class="emoji-container"></div>
+                        
+                        <!-- Apple Pro Vision Minimalist Corner Focus Borders -->
+                        <div class="focus-brackets">
+                            <span class="bracket top-left"></span>
+                            <span class="bracket top-right"></span>
+                            <span class="bracket bottom-left"></span>
+                            <span class="bracket bottom-right"></span>
+                        </div>
 
-                <!-- Geri Sayım Overlay -->
-                <div class="countdown-overlay" id="countdown-overlay">2</div>
-            </div>
-        </main>
+                        <!-- Top Floating Stream Pill & Zoom Pill -->
+                        <div class="stream-floating-pill">
+                            <span class="recording-dot"></span>
+                            <span>AI Neural Tracking Active</span>
+                        </div>
+
+                        <div class="stream-zoom-pill" id="zoom-indicator-pill" style="display: none;">
+                            <span class="zoom-icon">🔍</span>
+                            <span id="zoom-level-text">1.0x Zoom</span>
+                        </div>
+
+                        <!-- Gesture Instruction Badge -->
+                        <div class="stream-gesture-hint">
+                            <span class="hint-icon">🖐️/✊</span>
+                            <span>Açık El: Yakınlaş &bull; Yumruk: Uzaklaş &bull; 👍: Fotoğraf Çek</span>
+                        </div>
+
+                        <!-- 2-Second Countdown Overlay -->
+                        <div class="countdown-overlay" id="countdown-overlay">2</div>
+                    </div>
+                </section>
+
+                <!-- 2. Hızlı Telemetri & İstatistik Kartları (4 Kolonlu Grid) -->
+                <section class="telemetry-cards-row">
+                    <div class="telemetry-card">
+                        <div class="card-subhead">
+                            <span>El & Parmak</span>
+                            <span class="telemetry-indicator">● Canlı</span>
+                        </div>
+                        <div class="metric-main">
+                            <span class="metric-value" id="live-fingers-val">0</span>
+                            <span class="metric-unit">Parmak Açık</span>
+                        </div>
+                        <div class="metric-footer">
+                            <span>Aktif El: <strong id="live-hands-val">0</strong></span>
+                            <span>Tür: <strong id="live-hand-type-val">Hiçbiri</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="telemetry-card">
+                        <div class="card-subhead">
+                            <span>Yüz & Mimik</span>
+                            <span class="telemetry-indicator highlight-blue">● Algılandı</span>
+                        </div>
+                        <div class="metric-main">
+                            <span class="metric-value highlight-accent" id="live-expression-val">Normal</span>
+                        </div>
+                        <div class="metric-footer">
+                            <span>Aktif Yüz: <strong id="live-faces-val">0</strong></span>
+                            <span>Model: <strong>Mesh V2</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="telemetry-card">
+                        <div class="card-subhead">
+                            <span>Algılanan Nesneler</span>
+                            <span class="telemetry-indicator highlight-purple">● Vision</span>
+                        </div>
+                        <div class="metric-main scrollable-tag-box">
+                            <span class="object-tag" id="detected-objects-val">Hiçbiri</span>
+                        </div>
+                        <div class="metric-footer">
+                            <span>Model: <strong>EfficientDet-Lite0</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="telemetry-card">
+                        <div class="card-subhead">
+                            <span>Sistem Performansı</span>
+                            <span class="telemetry-indicator highlight-green">● Optimize</span>
+                        </div>
+                        <div class="metric-main">
+                            <span class="metric-value highlight-green">30 <small>FPS</small></span>
+                        </div>
+                        <div class="metric-footer">
+                            <span>Gecikme: <strong>~12ms</strong></span>
+                            <span>Thread: <strong>Safe Lock</strong></span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Yatay Fotoğraf Galerisi Şeridi (Photo Gallery Reel) -->
+                <section class="gallery-reel-section">
+                    <div class="reel-header">
+                        <div class="reel-title-group">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <h3>Çekilen Fotoğraflar</h3>
+                            <span class="reel-badge">Film Şeridi</span>
+                        </div>
+                        <div class="reel-actions">
+                            <button class="reel-action-btn" id="select-mode-btn">Seç</button>
+                            <button class="reel-action-btn btn-download" id="batch-download-btn" style="display: none;">İndir (0)</button>
+                            <button class="reel-action-btn btn-delete" id="batch-delete-btn" style="display: none;">Sil (0)</button>
+                        </div>
+                    </div>
+
+                    <div class="gallery-scroll-reel" id="photo-gallery">
+                        <span class="no-photos-msg">Henüz fotoğraf çekilmedi. Kameraya 👍 işareti yapın.</span>
+                    </div>
+                </section>
+
+            </main>
+        </div>
     </div>
 
-    <!-- Işık Kutusu (Lightbox Modal) -->
+    <!-- Minimalist Apple Lightbox Modal -->
     <div id="lightbox-modal" class="lightbox-modal">
-        <!-- Büyük ve Belirgin Kapat Butonu -->
-        <button class="lightbox-close-btn" id="lightbox-close-btn">&times; Kapat</button>
-        
-        <div class="lightbox-content">
-            <div class="lightbox-body">
-                <img id="lightbox-img" src="" alt="Detailed View">
-                
-                <!-- Fotoğraf Filtre/Efekt Ekleme Çubuğu -->
-                <div class="lightbox-effects-section">
-                    <span class="effects-title">Filtre Uygula:</span>
-                    <div class="effects-toolbar">
+        <div class="lightbox-backdrop"></div>
+        <div class="lightbox-container">
+            <header class="modal-header">
+                <div class="modal-title-meta">
+                    <span class="modal-title">Fotoğraf İnceleme</span>
+                    <span class="modal-date" id="lightbox-date">--/--/----</span>
+                </div>
+                <button class="modal-close-btn" id="lightbox-close-btn">&times;</button>
+            </header>
+
+            <div class="modal-image-wrapper">
+                <img id="lightbox-img" src="" alt="Captured Detailed View">
+            </div>
+
+            <!-- Post-Processing Effect Bar -->
+            <div class="modal-controls-bar">
+                <div class="effect-selector-group">
+                    <span class="ctrl-label">Filtre:</span>
+                    <div class="effect-pills">
                         <button class="effect-btn active" data-effect="normal">Orijinal</button>
                         <button class="effect-btn" data-effect="grayscale">Siyah Beyaz</button>
                     </div>
                     <button class="save-effect-btn" id="save-effect-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                         Efekti Kaydet
                     </button>
                 </div>
 
-                <div class="lightbox-details">
-                    <span class="lightbox-date" id="lightbox-date">Tarih: --/--/----</span>
-                    <div class="lightbox-actions" style="display: flex; gap: 8px;">
-                        <button class="lightbox-download-btn" id="lightbox-download-btn">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            Fotoğrafı İndir
-                        </button>
-                        <button class="lightbox-delete-btn" id="lightbox-delete-btn">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                            Fotoğrafı Sil
-                        </button>
-                    </div>
+                <div class="modal-action-buttons">
+                    <button class="modal-btn btn-dl" id="lightbox-download-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        İndir
+                    </button>
+                    <button class="modal-btn btn-del" id="lightbox-delete-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Sil
+                    </button>
                 </div>
             </div>
         </div>
