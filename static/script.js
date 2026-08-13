@@ -199,27 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     initChart();
 
-    // ---------------------------------------------------------------
-    // 5. Emoji Rain Animation
-    // ---------------------------------------------------------------
-    function triggerEmojiRain() {
-        const container = document.getElementById('emoji-container');
-        if (!container) return;
 
-        const emojis = ['✨', '😊', '🎉', '🌟', '👍', '🌸', '🥳'];
-        const count = 6;
-        for (let i = 0; i < count; i++) {
-            const emojiEl = document.createElement('span');
-            emojiEl.className = 'floating-emoji';
-            emojiEl.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-            emojiEl.style.left = (Math.random() * 85 + 5) + '%';
-            emojiEl.style.animationDuration = (1.8 + Math.random() * 1.2) + 's';
-            emojiEl.style.fontSize = (20 + Math.random() * 14) + 'px';
-
-            container.appendChild(emojiEl);
-            setTimeout(() => { emojiEl.remove(); }, 3000);
-        }
-    }
 
     // ---------------------------------------------------------------
     // 6. Mimic Challenge Game
@@ -732,33 +712,138 @@ document.addEventListener('DOMContentLoaded', function () {
     // ---------------------------------------------------------------
     // 11. Live Telemetry Polling & Hand/Face Stats
     // ---------------------------------------------------------------
-    const liveFingersVal = document.getElementById('live-fingers-val');
-    const liveHandsVal = document.getElementById('live-hands-val');
-    const liveHandTypeVal = document.getElementById('live-hand-type-val');
-    const liveFacesVal = document.getElementById('live-faces-val');
-    const liveExpressionVal = document.getElementById('live-expression-val');
-    const detectedObjectsVal = document.getElementById('detected-objects-val');
     let lastProcessedSwipeTime = 0;
+    let hoverStart = null;
 
     async function updateStats() {
         try {
             const response = await fetch('/stats');
             const data = await response.json();
 
-            // Telemetri Değerleri
-            if (liveFingersVal) liveFingersVal.textContent = data.total_fingers !== undefined ? data.total_fingers : '0';
-            if (liveHandsVal) liveHandsVal.textContent = data.hand_count !== undefined ? data.hand_count : '0';
-            if (liveHandTypeVal) liveHandTypeVal.textContent = data.hand_types || 'Hiçbiri';
-            if (liveFacesVal) liveFacesVal.textContent = data.face_count !== undefined ? data.face_count : '0';
-            if (liveExpressionVal) liveExpressionVal.textContent = data.face_expression || 'Normal';
+            // 1. Yeni Kurumsal Durum Çubuğu (Status Bar) Güncellemeleri
+            const statusCamera = document.getElementById('status-camera');
+            const statusHand = document.getElementById('status-hand');
+            const statusExpression = document.getElementById('status-expression');
+            const statusCanvas = document.getElementById('status-canvas');
+            const statusFps = document.getElementById('status-fps');
 
-            if (detectedObjectsVal) {
-                if (data.detected_objects && data.detected_objects.length > 0) {
-                    const uniqueObjects = [...new Set(data.detected_objects)];
-                    detectedObjectsVal.textContent = uniqueObjects.join(', ');
-                } else {
-                    detectedObjectsVal.textContent = 'Hiçbiri';
+            if (statusCamera) {
+                statusCamera.textContent = data.status === 'active' ? 'ONLINE' : 'OFFLINE';
+                statusCamera.className = data.status === 'active' ? 'status-value active' : 'status-value';
+            }
+
+            if (statusHand) {
+                let handText = 'Hiçbiri';
+                if (data.hand_count === 1) {
+                    handText = data.hand_types === 'Sağ El' ? 'Sağ El' : 'Sol El';
+                } else if (data.hand_count === 2) {
+                    handText = 'İki El';
                 }
+                statusHand.textContent = handText;
+                statusHand.className = data.hand_count > 0 ? 'status-value active' : 'status-value';
+            }
+
+            if (statusExpression) {
+                statusExpression.textContent = data.face_expression || 'Normal';
+                statusExpression.className = data.face_expression !== 'Normal' ? 'status-value highlight-blue active' : 'status-value highlight-blue';
+            }
+
+            if (statusCanvas) {
+                const isCanvasActive = data.air_canvas_enabled;
+                if (!isCanvasActive) {
+                    statusCanvas.textContent = 'Kapalı';
+                    statusCanvas.className = 'status-value';
+                } else {
+                    statusCanvas.textContent = data.canvas_gesture || 'Beklemede';
+                    if (data.canvas_gesture === 'Kalem Modu') {
+                        statusCanvas.className = 'status-value highlight-orange active';
+                    } else if (data.canvas_gesture === 'Silgi') {
+                        statusCanvas.className = 'status-value highlight-orange active';
+                    } else if (data.canvas_gesture === 'Lazer İşaretçi') {
+                        statusCanvas.className = 'status-value highlight-orange active';
+                    } else {
+                        statusCanvas.className = 'status-value highlight-orange';
+                    }
+                }
+            }
+
+            // Sync toggle and update status telemetry in side panel
+            const canvasGestureVal = document.getElementById('canvas-gesture-val');
+            const canvasGestureDot = document.getElementById('canvas-gesture-dot');
+            const canvasToggle = document.getElementById('canvas-toggle');
+
+            if (data.air_canvas_enabled !== undefined && canvasToggle) {
+                if (document.activeElement !== canvasToggle) {
+                    canvasToggle.checked = data.air_canvas_enabled;
+                }
+            }
+
+            if (canvasGestureVal && canvasGestureDot && data.canvas_gesture) {
+                canvasGestureVal.textContent = data.canvas_gesture;
+                canvasGestureDot.className = 'status-dot';
+                if (data.canvas_gesture === 'Kalem Modu') {
+                    canvasGestureDot.classList.add('writing');
+                } else if (data.canvas_gesture === 'Silgi') {
+                    canvasGestureDot.classList.add('eraser');
+                } else if (data.canvas_gesture === 'Lazer İşaretçi') {
+                    canvasGestureDot.classList.add('laser');
+                } else {
+                    canvasGestureDot.classList.add('standby');
+                    canvasGestureVal.textContent = 'Beklemede';
+                }
+            }
+
+            // Temassız Hızlı Sıfırlama Butonu Hover Kontrolü
+            const hoverClearEl = document.getElementById('canvas-hover-clear');
+            const progressCircle = document.querySelector('.hover-progress-ring__circle');
+
+            if (data.air_canvas_enabled) {
+                if (hoverClearEl) hoverClearEl.style.display = 'flex';
+
+                const px = data.pointer_x;
+                const py = data.pointer_y;
+
+                // 1280x720 çözünürlüğünde üst-orta bölgede mi?
+                const isHovered = px >= 480 && px <= 800 && py >= 0 && py <= 95;
+
+                if (isHovered) {
+                    if (!hoverClearEl.classList.contains('hovering')) {
+                        hoverClearEl.classList.add('hovering');
+                        hoverStart = performance.now();
+                    }
+
+                    const elapsed = performance.now() - hoverStart;
+                    const percent = Math.min(1.0, elapsed / 1200); // 1.2 saniye hedef
+                    
+                    if (progressCircle) {
+                        const offset = 44 - (percent * 44);
+                        progressCircle.style.strokeDashoffset = offset;
+                    }
+
+                    if (percent >= 1.0) {
+                        hoverStart = performance.now(); // reset timer
+                        triggerShutterFlash(); // Görsel flaş geri bildirimi
+                        
+                        // Arka plana temizleme isteği gönder
+                        fetch('/clear_canvas', { method: 'POST' }).then(() => {
+                            if (progressCircle) progressCircle.style.strokeDashoffset = 44;
+                            hoverClearEl.classList.remove('hovering');
+                        });
+                    }
+                } else {
+                    if (hoverClearEl && hoverClearEl.classList.contains('hovering')) {
+                        hoverClearEl.classList.remove('hovering');
+                    }
+                    hoverStart = null;
+                    if (progressCircle) progressCircle.style.strokeDashoffset = 44;
+                }
+            } else {
+                if (hoverClearEl) {
+                    hoverClearEl.style.display = 'none';
+                    hoverClearEl.classList.remove('hovering');
+                }
+                hoverStart = null;
+                if (progressCircle) progressCircle.style.strokeDashoffset = 44;
             }
 
             // Thumbs Up ile Fotoğraf Tetikleme
@@ -766,43 +851,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 startCountdown();
             }
 
-            // Duygu Grafiği Güncelleme
-            if (expressionChart) {
-                const currentExpr = data.face_expression || 'Normal';
-                let key = 'Normal';
-                if (currentExpr === 'Mutlu' || currentExpr === 'Happy') {
-                    key = 'Mutlu';
-                    triggerEmojiRain();
-                } else if (currentExpr === 'Saskin' || currentExpr === 'Surprised') {
-                    key = 'Saskin';
-                } else if (currentExpr === 'Uzgun' || currentExpr === 'Sad') {
-                    key = 'Uzgun';
-                }
-
-                expressionCounts[key]++;
-                expressionChart.data.datasets[0].data = [
-                    expressionCounts['Normal'],
-                    expressionCounts['Mutlu'],
-                    expressionCounts['Saskin'],
-                    expressionCounts['Uzgun']
-                ];
-                expressionChart.update();
-            }
-
-            // Mimik Oyunu Kontrolü
-            if (gameActive && gameTarget) {
-                const success = gameTarget.check(data);
-                if (success) {
-                    flashCameraStage('green');
-                    gameScore++;
-                    if (gameScoreVal) gameScoreVal.textContent = gameScore;
-                    startNewChallenge();
-                }
-            }
-
             // Açık El / Yumruk ile Dinamik Zoom Kontrolü & Rozet Gösterimi
             if (data.zoom_factor !== undefined && videoStream) {
-                videoStream.style.transition = 'transform 0.1s ease-out';
+                videoStream.style.transition = 'transform 0.05s ease-out';
                 videoStream.style.transform = `scale(${data.zoom_factor})`;
 
                 const zoomPill = document.getElementById('zoom-indicator-pill');
@@ -837,15 +888,98 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ---------------------------------------------------------------
+    // 12. Precision Air Canvas Controls & Event Bindings
+    // ---------------------------------------------------------------
+    const canvasToggle = document.getElementById('canvas-toggle');
+    const colorPills = document.querySelectorAll('.color-pill');
+    const brushSizeButtons = document.querySelectorAll('#canvas-brush-size .segment-btn');
+    const canvasClearBtn = document.getElementById('canvas-clear-btn');
+
+    async function sendCanvasSettings() {
+        if (!canvasToggle) return;
+        
+        const enabled = canvasToggle.checked;
+        const activeColorPill = document.querySelector('.color-pill.active');
+        const color = activeColorPill ? activeColorPill.getAttribute('data-color') : '#0a84ff';
+        
+        const activeSizeBtn = document.querySelector('#canvas-brush-size .segment-btn.active');
+        const size = activeSizeBtn ? parseInt(activeSizeBtn.getAttribute('data-size')) : 6;
+
+        try {
+            await fetch('/canvas_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled, color, size })
+            });
+        } catch (err) {
+            console.error('Tuval ayarları güncellenemedi:', err);
+        }
+    }
+
+    if (canvasToggle) {
+        canvasToggle.addEventListener('change', sendCanvasSettings);
+    }
+
+    colorPills.forEach(pill => {
+        pill.addEventListener('click', function() {
+            colorPills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            sendCanvasSettings();
+        });
+    });
+
+    brushSizeButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            brushSizeButtons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            sendCanvasSettings();
+        });
+    });
+
+    if (canvasClearBtn) {
+        canvasClearBtn.addEventListener('click', async function() {
+            const originalText = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<span>Temizleniyor...</span>';
+            
+            try {
+                const res = await fetch('/clear_canvas', { method: 'POST' });
+                const data = await res.json();
+                if (data.status !== 'success') {
+                    alert('Tuval temizlenirken hata oluştu: ' + data.message);
+                }
+            } catch (err) {
+                console.error('Tuval temizleme hatası:', err);
+            } finally {
+                this.disabled = false;
+                this.innerHTML = originalText;
+            }
+        });
+    }
+
     // Başlangıç
     loadPhotos();
-    // 80ms ultra-hızlı senkronizasyon (Anlık el tepkisi)
-    setInterval(updateStats, 80);
+    // 45ms ultra-hızlı senkronizasyon (Anlık el tepkisi, daha akıcı zoom ve çizim)
+    setInterval(updateStats, 45);
     updateStats();
 
     // Klavye kısayolları
     document.addEventListener('keydown', function (e) {
         if (e.key === '1') document.querySelector('[data-filter="normal"]')?.click();
         if (e.key === '2') document.querySelector('[data-filter="grayscale"]')?.click();
+        
+        // Tuval Kısayolları (T ve C)
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            if (e.key.toLowerCase() === 't') {
+                if (canvasToggle) {
+                    canvasToggle.checked = !canvasToggle.checked;
+                    sendCanvasSettings();
+                }
+            }
+            if (e.key.toLowerCase() === 'c') {
+                canvasClearBtn?.click();
+            }
+        }
     });
 });

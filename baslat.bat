@@ -7,7 +7,13 @@ echo         GestureFlow AI Baslatiliyor...
 echo ==================================================
 echo.
 
-python app.py
+if exist venv\Scripts\python.exe (
+    echo [BILGI] Sanal ortam (venv) aktiflestiriliyor...
+    venv\Scripts\python.exe app.py
+) else (
+    echo [UYARI] Sanal ortam bulunamadi, sistem Python'i kullaniliyor...
+    python app.py
+)
 
 if %errorlevel% neq 0 (
     echo.

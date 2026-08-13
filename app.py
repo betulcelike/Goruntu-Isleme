@@ -1,6 +1,6 @@
 """
 GestureFlow AI — Vision Intelligence Studio
-Yüksek Performanslı, Çok İş Parçacıklı (Multi-Threaded) ve Düşük Gecikmeli Kamera & AI Motoru
+Yüksek Performansli, Çok İş Parçacikli (Multi-Threaded) ve Düşük Gecikmeli Kamera & AI Motoru
 """
 
 from flask import Flask, render_template, Response, request
@@ -28,11 +28,6 @@ face_mesh = None
 face_mesh_ready = False
 current_face_expression = "Normal"
 
-# Nesne Tanıma
-object_detector = None
-object_detector_ready = False
-detected_objects_summary = []
-
 # Jest ve Zoom Değişkenleri
 hand_x_history = []
 swipe_event = None
@@ -53,9 +48,16 @@ live_total_fingers = 0
 live_hand_types = "Hiçbiri"
 live_face_count = 0
 
+# Hava Tuvali (Air Canvas) Durum Değişkenleri
+air_canvas_enabled = False
+drawing_canvas = None
+active_brush_color = (255, 132, 10)  # BGR olarak Tech Blue (#0a84ff)
+active_brush_size = 6
+last_pointer_pos = {}
+live_canvas_gesture = "Standby"
+
 # Önbellek Verileri
 cached_faces = []
-cached_objects = []
 cached_hands = []
 
 # Klasörü otomatik oluştur
@@ -128,24 +130,6 @@ def init_mediapipe():
         print(f"FaceLandmarker yuklenemedi: {e_face}")
         face_mesh_ready = False
 
-    # 3. Nesne Algılama
-    try:
-        import mediapipe as mp
-        from mediapipe.tasks import python
-        from mediapipe.tasks.python import vision
-        
-        object_options = vision.ObjectDetectorOptions(
-            base_options=python.BaseOptions(model_asset_path='efficientdet_lite0.tflite'),
-            score_threshold=0.5,
-            max_results=4
-        )
-        object_detector = vision.ObjectDetector.create_from_options(object_options)
-        object_detector_ready = True
-        print("MediaPipe ObjectDetector basariyla yuklendi!")
-    except Exception as e_obj:
-        print(f"ObjectDetector yuklenemedi: {e_obj}")
-        object_detector_ready = False
-        
     return hands_ready
 
 mediapipe_ready = init_mediapipe()
@@ -233,6 +217,59 @@ def count_fingers(landmarks, hand_type):
             
     return fingers_up
 
+
+def get_finger_states(landmarks, hand_type):
+    """
+    Kullanıcının elindeki parmakların açık (True) veya kapalı (False) durumlarını döner.
+    Dönen liste sırasıyla: [Başparmak, İşaret, Orta, Yüzük, Serçe]
+    """
+    if len(landmarks) < 21:
+        return [False, False, False, False, False]
+        
+    finger_states = [False] * 5
+    
+    # 1. Başparmak (Thumb)
+    # Sağ ve sol el yönelimine göre yatay pozisyon kontrolü
+    tip_x, tip_y = landmarks[4]
+    mcp_x, mcp_y = landmarks[2]
+    if hand_type == "Right":
+        if tip_x < mcp_x - 10:
+            finger_states[0] = True
+    else:
+        if tip_x > mcp_x + 10:
+            finger_states[0] = True
+            
+    # 2. Diğer parmaklar (İşaret, Orta, Yüzük, Serçe)
+    # Uç noktasının (tip) eklem noktasından (pip) daha yukarıda (y değerinin küçük olması) kontrolü
+    tips = [8, 12, 16, 20]
+    pips = [6, 10, 14, 18]
+    for i, (tip_idx, pip_idx) in enumerate(zip(tips, pips)):
+        if landmarks[tip_idx][1] < landmarks[pip_idx][1]:
+            finger_states[i + 1] = True
+            
+    return finger_states
+
+
+def get_canvas_gesture(finger_states):
+    """
+    Parmak durumlarına göre tuval jestini sınıflandırır.
+    Geri dönüş değeri: 'pen', 'laser', 'eraser' veya 'idle'
+    """
+    thumb, index, middle, ring, pinky = finger_states
+    
+    # Kalem: İşaret parmağı açık, orta/yüzük/serçe kapalı
+    if index and not middle and not ring and not pinky:
+        return "pen"
+    # Lazer İşaretçi: İşaret ve orta parmak açık, yüzük ve serçe kapalı
+    elif index and middle and not ring and not pinky:
+        return "laser"
+    # Silgi: İşaret, orta, yüzük ve serçe parmakların hepsi açık
+    elif index and middle and ring and pinky:
+        return "eraser"
+    else:
+        return "idle"
+
+
 # ---------------------------------------------------------------
 # 2. Asenkron Arka Plan AI Çıkarım Motoru (Inference Worker)
 # ---------------------------------------------------------------
@@ -254,7 +291,7 @@ class AsyncAIWorker:
             self.latest_frame = frame
 
     def loop(self):
-        global current_face_expression, detected_objects_summary, cached_faces, cached_objects, cached_hands
+        global current_face_expression, cached_faces, cached_hands
         global live_hand_count, live_total_fingers, live_hand_types, live_face_count
         global thumbs_up_active, hand_x_history, swipe_event, swipe_time, zoom_factor
         
@@ -392,41 +429,7 @@ class AsyncAIWorker:
             except Exception:
                 pass
 
-            # 3. Nesne Algılama (Her 6 karede bir)
-            if object_detector_ready and object_detector is not None and self.frame_count % 6 == 0:
-                try:
-                    import mediapipe as mp
-                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_small)
-                    obj_results = object_detector.detect(mp_image)
-                    new_cached_objects = []
-                    new_objects_summary = []
-                    
-                    if obj_results.detections:
-                        for detection in obj_results.detections:
-                            category = detection.categories[0]
-                            label = category.category_name
-                            score = category.score
-                            if score < 0.5:
-                                continue
-                            bbox = detection.bounding_box
-                            scale_x = w / 256.0
-                            scale_y = h / 144.0
-                            ox = int(bbox.origin_x * scale_x)
-                            oy = int(bbox.origin_y * scale_y)
-                            ow = int(bbox.width * scale_x)
-                            oh = int(bbox.height * scale_y)
-                            
-                            new_cached_objects.append({
-                                'bbox': (ox, oy, ox + ow, oy + oh),
-                                'label': f"{label} ({int(score * 100)}%)"
-                            })
-                            new_objects_summary.append(label)
-                            
-                    with process_lock:
-                        cached_objects = new_cached_objects
-                        detected_objects_summary = new_objects_summary
-                except Exception:
-                    pass
+
 
             # 4. Jestler ve Başparmak Kontrolü
             is_thumbs_up = False
@@ -445,30 +448,27 @@ class AsyncAIWorker:
             if new_cached_hands:
                 hand = new_cached_hands[0]
                 landmarks = hand.get('landmarks_px', [])
+                fingers = hand.get('fingers', 0)
+                
+                # 1. Kararlı Adım-Tabanlı Zoom Kontrolü (Hava Tuvali aktifken kilitlenir)
+                if air_canvas_enabled:
+                    if zoom_factor > 1.01:
+                        zoom_factor = float(zoom_factor * 0.90 + 1.0 * 0.10)
+                    else:
+                        zoom_factor = 1.0
+                else:
+                    # 5 parmak açık ise kademeli yakınlaş (Zoom In)
+                    if fingers == 5:
+                        zoom_factor = float(min(1.9, zoom_factor + 0.025))
+                    # Yumruk (0 parmak) ise kademeli uzaklaş (Zoom Out)
+                    elif fingers == 0:
+                        zoom_factor = float(max(1.0, zoom_factor - 0.025))
+                    # Diğer durumlarda (çizim, lazer, bekleme) mevcut zoom değerini koru (Titremeyi engeller)
+                    else:
+                        pass
+                
+                # 2. Temassız Kaydırma (Swipe) Tespiti
                 if len(landmarks) >= 21:
-                    # 1. Profesyonel ve 1:1 Senkronize El Açıklığı (Aperture) Zoom Algoritması
-                    # Bilek (0) ile Parmak Uçları (4, 8, 12, 16, 20) arasındaki mesafeyi avuç içi boyuna (0-9) oranla
-                    w_pt = landmarks[0]
-                    m_pt = landmarks[9]
-                    palm_size = float(np.hypot(m_pt[0] - w_pt[0], m_pt[1] - w_pt[1]))
-
-                    if palm_size > 12.0:
-                        tip_indices = [4, 8, 12, 16, 20]
-                        tip_distances = [np.hypot(landmarks[idx][0] - w_pt[0], landmarks[idx][1] - w_pt[1]) for idx in tip_indices]
-                        avg_tip_dist = float(np.mean(tip_distances))
-                        
-                        # Oran: Yumruk ~0.85-0.95 | Tam Açık El ~1.80-2.2
-                        ratio = avg_tip_dist / palm_size
-                        
-                        # [0.0 (Yumruk) ile 1.0 (Tam Açık El)] arasına normalize et
-                        normalized_open = float(np.clip((ratio - 0.90) / (1.80 - 0.90), 0.0, 1.0))
-                        
-                        # Hedef Zoom: Yumruk = 1.0x, Açık El = 1.9x
-                        target_zoom = 1.0 + (normalized_open * 0.90)
-                        
-                        # Pürüzsüz Lerp (Yumuşak Geçiş / Exponential Smoothing):
-                        zoom_factor = float(zoom_factor * 0.70 + target_zoom * 0.30)
-                    
                     cx = landmarks[9][0]
                     hand_x_history.append((cx, current_time))
                     hand_x_history = [p for p in hand_x_history if current_time - p[1] < 0.4]
@@ -482,9 +482,9 @@ class AsyncAIWorker:
                                 swipe_time = current_time
                                 hand_x_history.clear()
             else:
-                # El yoksa yavaşça ve pürüzsüzce 1.0x normal boyuta dön
+                # El yoksa hızlıca ve pürüzsüzce 1.0x normal boyuta dön
                 if zoom_factor > 1.01:
-                    zoom_factor = float(zoom_factor * 0.90 + 1.0 * 0.10)
+                    zoom_factor = float(zoom_factor * 0.85 + 1.0 * 0.15)
                 else:
                     zoom_factor = 1.0
 
@@ -507,7 +507,8 @@ ai_worker = AsyncAIWorker().start()
 # 3. Yüksek Hızlı Çizim ve Video Akışı (60 FPS Stream)
 # ---------------------------------------------------------------
 def draw_overlays(frame):
-    """Önbellekteki AI sonuçlarını kare üzerine mikro saniyeler içinde uygula"""
+    """Önbellekteki AI sonuçlarini kare üzerine mikro saniyeler içinde uygula ve Hava Tuvalini yönetir"""
+    global drawing_canvas, last_pointer_pos, live_canvas_gesture
     with process_lock:
         local_hands = list(cached_hands)
         local_faces = list(cached_faces)
@@ -574,11 +575,82 @@ def draw_overlays(frame):
         cv2.rectangle(frame, (x, badge_y - th - 6), (x + tw + 12, badge_y + 4), (255, 200, 0), 1)
         cv2.putText(frame, badge_text, (x + 6, badge_y - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
-    # 3. Nesneler
-    for obj in local_objects:
-        ox1, oy1, ox2, oy2 = obj['bbox']
-        cv2.rectangle(frame, (ox1, oy1), (ox2, oy2), (255, 150, 50), 2)
-        cv2.putText(frame, obj['label'], (ox1, oy1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 150, 50), 1, cv2.LINE_AA)
+
+
+    # 4. Hava Tuvali (Air Canvas) Mantığı
+    if drawing_canvas is None:
+        h, w = frame.shape[:2]
+        drawing_canvas = np.zeros((h, w, 3), dtype=np.uint8)
+
+    active_gesture = "Standby"
+    
+    if air_canvas_enabled and len(local_hands) > 0:
+        hand = local_hands[0]
+        hand_type = hand['type']
+        
+        if 'landmarks_px' in hand:
+            px = hand['landmarks_px']
+            finger_states = get_finger_states(px, hand_type)
+            gesture = get_canvas_gesture(finger_states)
+            
+            # Koordinatlar
+            if len(px) >= 21:
+                ix, iy = px[8] # İşaret parmağı ucu
+                mx, my = px[9] # Silgi için avuç içi (orta parmak mcp)
+                
+                if gesture == "pen":
+                    active_gesture = "Kalem Modu"
+                    last_pos = last_pointer_pos.get(hand_type)
+                    if last_pos is not None:
+                        dist = np.hypot(ix - last_pos[0], iy - last_pos[1])
+                        if dist < 120:
+                            cv2.line(drawing_canvas, last_pos, (ix, iy), active_brush_color, active_brush_size, cv2.LINE_AA)
+                    last_pointer_pos[hand_type] = (ix, iy)
+                    
+                    # Kalem ucu görselleştirme (kamera karesine geçici olarak çizilir)
+                    cv2.circle(frame, (ix, iy), active_brush_size + 2, (255, 255, 255), -1, cv2.LINE_AA)
+                    cv2.circle(frame, (ix, iy), active_brush_size, active_brush_color, -1, cv2.LINE_AA)
+                    
+                elif gesture == "eraser":
+                    active_gesture = "Silgi"
+                    eraser_radius = 45
+                    cv2.circle(drawing_canvas, (mx, my), eraser_radius, (0, 0, 0), -1)
+                    
+                    # Ekrana geçici silgi halkası çizelim
+                    cv2.circle(frame, (mx, my), eraser_radius, (255, 255, 255), 2, cv2.LINE_AA)
+                    cv2.circle(frame, (mx, my), eraser_radius + 4, (100, 100, 100), 1, cv2.LINE_AA)
+                    cv2.putText(frame, "SILGI", (mx - 20, my + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                    
+                    last_pointer_pos[hand_type] = None
+                    
+                elif gesture == "laser":
+                    active_gesture = "Lazer İşaretçi"
+                    # Lazer parlama efekti (geçiçi)
+                    cv2.circle(frame, (ix, iy), 12, (0, 0, 255), 2, cv2.LINE_AA)
+                    cv2.circle(frame, (ix, iy), 6, (0, 0, 255), -1, cv2.LINE_AA)
+                    cv2.circle(frame, (ix, iy), 2, (255, 255, 255), -1, cv2.LINE_AA)
+                    
+                    last_pointer_pos[hand_type] = None
+                    
+                else: # idle
+                    active_gesture = "Standby"
+                    last_pointer_pos[hand_type] = None
+                    
+                    # İnce bir hedefleme halkası gösterelim
+                    cv2.circle(frame, (ix, iy), 5, (255, 255, 255), 1, cv2.LINE_AA)
+                    cv2.circle(frame, (ix, iy), 2, (180, 180, 180), -1, cv2.LINE_AA)
+    else:
+        last_pointer_pos.clear()
+        
+    live_canvas_gesture = active_gesture
+
+    # Tuval maskesini ana kareye uygulayalım
+    if air_canvas_enabled and drawing_canvas is not None:
+        if drawing_canvas.shape[:2] != frame.shape[:2]:
+            drawing_canvas = cv2.resize(drawing_canvas, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_NEAREST)
+        gray = cv2.cvtColor(drawing_canvas, cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+        frame[mask > 0] = drawing_canvas[mask > 0]
 
     return frame
 
@@ -624,6 +696,15 @@ def video_feed():
 
 @app.route('/stats')
 def stats():
+    ptr_x = -1
+    ptr_y = -1
+    with process_lock:
+        local_hands = list(cached_hands)
+    if air_canvas_enabled and len(local_hands) > 0:
+        hand = local_hands[0]
+        if 'landmarks_px' in hand and len(hand['landmarks_px']) >= 21:
+            ptr_x, ptr_y = hand['landmarks_px'][8]
+            
     return {
         'status': 'active',
         'mediapipe_ready': mediapipe_ready,
@@ -631,7 +712,6 @@ def stats():
         'latest_photo_reason': latest_photo_reason,
         'latest_photo_timestamp': latest_photo_timestamp,
         'face_expression': current_face_expression,
-        'detected_objects': detected_objects_summary,
         'thumbs_up_detected': thumbs_up_active,
         'hand_count': live_hand_count,
         'total_fingers': live_total_fingers,
@@ -639,8 +719,46 @@ def stats():
         'face_count': live_face_count,
         'zoom_factor': round(zoom_factor, 2),
         'swipe_event': swipe_event,
-        'swipe_timestamp': int(swipe_time * 1000)
+        'swipe_timestamp': int(swipe_time * 1000),
+        'air_canvas_enabled': air_canvas_enabled,
+        'canvas_gesture': live_canvas_gesture,
+        'brush_color': f"#{active_brush_color[2]:02x}{active_brush_color[1]:02x}{active_brush_color[0]:02x}",
+        'pointer_x': ptr_x,
+        'pointer_y': ptr_y
     }
+
+@app.route('/canvas_settings', methods=['POST'])
+def canvas_settings():
+    global air_canvas_enabled, active_brush_color, active_brush_size
+    data = request.json or {}
+    
+    if 'enabled' in data:
+        air_canvas_enabled = bool(data['enabled'])
+        
+    if 'color' in data:
+        hex_color = data['color'].lstrip('#')
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        active_brush_color = (b, g, r)
+        
+    if 'size' in data:
+        active_brush_size = int(data['size'])
+        
+    return {
+        'status': 'success',
+        'enabled': air_canvas_enabled,
+        'color': data.get('color', '#0a84ff'),
+        'size': active_brush_size
+    }
+
+@app.route('/clear_canvas', methods=['POST'])
+def clear_canvas():
+    global drawing_canvas
+    with process_lock:
+        if drawing_canvas is not None:
+            drawing_canvas.fill(0)
+    return {'status': 'success', 'message': 'Hava tuvali temizlendi'}
 
 @app.route('/capture_now', methods=['POST'])
 def capture_now():
@@ -662,7 +780,7 @@ def capture_now():
                 'filename': photo_filename,
                 'timestamp': latest_photo_timestamp
             }
-    return {'status': 'error', 'message': 'Görüntü yakalanamadı'}, 500
+    return {'status': 'error', 'message': 'Görüntü yakalanamadi'}, 500
 
 @app.route('/list_photos')
 def list_photos():
