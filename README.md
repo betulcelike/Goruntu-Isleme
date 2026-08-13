@@ -1,33 +1,33 @@
-# Gerçek Zamanlı El Hareketleri ve Yüz İfadesi Analiz Platformu (GestureFlow AI)
+# Kurumsal Sunum ve Temassız Etkileşim Platformu (GestureFlow Studio)
 
-Bu proje; derin öğrenme ve bilgisayarlı görü (Computer Vision) tekniklerini kullanarak web kamerası üzerinden eş zamanlı el eklemleri takibi, yüz ifadesi (mimik) analizi ve nesne algılama gerçekleştiren yapay zeka destekli interaktif bir web platformudur.
+Bu proje; derin öğrenme ve bilgisayarlı görü (Computer Vision) tekniklerini kullanarak web kamerası üzerinden eş zamanlı el eklemleri takibi, yüz ifadesi (mimik) analizi ve temassız sunum yönetimi gerçekleştiren yapay zeka destekli interaktif bir **Kurumsal Sunum ve Tasarım Stüdyosu** (Enterprise Presentation Studio) platformudur.
 
-Kullanıcılar el işaretleriyle (👍) temassız fotoğraf çekebilir, çekilen fotoğraflara filtreler uygulayıp kaydedebilir ve gerçek zamanlı takip istatistiklerini panel üzerinden canlı izleyebilir.
+Platform, özellikle iş toplantılarında, sunumlarda ve uzaktan eğitimlerde temassız bir biçimde ekranı kontrol etme, hava kalemiyle çizim yapma, not alma ve seans kayıtları alma ihtiyaçları için optimize edilmiştir.
 
 ---
 
 ## 🚀 Öne Çıkan Özellikler
 
-*   **Temassız Kamera Tetikleme (Thumbs Up 👍):** Kameraya karşı yapılan Başparmak Yukarı işareti algılandığında 2 saniyelik görsel bir geri sayım başlar ve otomatik fotoğraf çekilir.
-*   **Gerçek Zamanlı İstatistik Paneli:** 
-    *   **El Takibi:** Aktif el sayısı, açık parmak sayısı ve sağ/sol el ayrımı.
-    *   **Yüz ve Mimik Analizi:** Aktif yüz sayısı ve birincil yüz ifadesi (*Mutlu, Şaşkın, Üzgün, Normal*).
-    *   **Nesne Algılama:** Kadraja giren günlük nesnelerin (*telefon, bardak, bilgisayar vb.*) tespiti.
-*   **Canlı Görüntü Filtreleri:** Kamera yayınına anlık olarak uygulanabilen filtreler (*Gri Ton, Sepia, Negatif, Bulanık, Kontrast*).
-*   **Fotoğraf Galerisi ve Detay İnceleme (Lightbox):** Çekilen fotoğrafların tarihe göre listelendiği, tıklanarak detaylı incelenebildiği ve silinebildiği arayüz.
-*   **Fotoğraf Efekt Editörü (Post-Editing):** Çekilen fotoğraflara detay ekranında sonradan filtreler (*Sepia, Gri Ton, Negatif, Bulanık, Sıcak, Soğuk*) uygulayıp kalıcı olarak diske kaydetme.
-*   **30 FPS Performans Optimizasyonu:**
-    *   Yapay zeka modellerine gönderilen kareler `320x180` çözünürlüğe ölçeklenerek CPU yükü azaltılmıştır.
-    *   **Kare Atlama ve Önbellekleme (Frame Skipping Cache):** El takibi 2, yüz mesh takibi 4 ve nesne algılama 8 karede bir çalışacak şekilde paralel işlenerek pürüzsüz 30 FPS görüntü hızı elde edilmiştir.
-    *   **Thread-Safe Bellek Yönetimi:** Fotoğraf kaydetme anında OpenCV kamera kilitlenmelerini önlemek için iş parçacığı korumalı (thread-safe) bellek önbelleği kullanılmıştır.
+*   **✍️ Hassas Sunum Tuvali (Precision Presentation Canvas):** Sunum esnasında ekrana dokunmadan havada çizim yapmanızı sağlayan yapay zeka tabanlı çizim motoru.
+    *   ☝️ **Kalem Modu (☝️):** Sadece işaret parmağı açıkken ekrana pürüzsüz çizgilerle çizim yapar. Kareler arasındaki gecikmeyi sıfırlayan akıllı takip algoritması entegredir.
+    *   ✌️ **Lazer İşaretçi Modu (✌️):** İşaret ve orta parmak açıkken sunum alanında parlayan fütüristik kırmızı bir lazer odağı (beyaz çekirdekli halka) yansıtır.
+    *   🖐️ **Hava Silgisi Modu (🖐️):** Elinizi tamamen açtığınızda avuç içi merkezini baz alarak dairesel bir yarıçapta çizimleri temizler.
+*   **🧹 Temassız Hızlı Sıfırlama (Contactless Hover Clear):** Arayüzün üst-orta kısmında duran yarı şeffaf `Sıfırla` butonuna işaret parmağınızla **1.2 saniye** odaklandığınızda çizim tuvali anında temizlenir. Bu buton tamamen web arayüzünde çizildiği için **çekilen fotoğraflarda kesinlikle görünmez**.
+*   **📐 Kararlı Adım-Tabanlı Zoom:** Görüntü gürültüsünden kaynaklanan titremeleri önleyen kararlı yakınlaştırma motoru.
+    *   🖐️ **5 Parmak Açık:** Kademeli yakınlaşma (`Zoom In` - maksimum 1.9x).
+    *   ✊ **Yumruk (0 Parmak):** Kademeli uzaklaşma (`Zoom Out` - minimum 1.0x).
+    *   *Diğer jestlerde veya çizim esnasında zoom miktarı kararlılık için kilitli kalır.*
+*   **📸 Temassız Kamera Tetikleme (Thumbs Up 👍):** Kameraya yapılan 👍 işareti algılandığında 2 saniyelik görsel bir geri sayım tetiklenir, çizimlerinizle birlikte ekranın ekran görüntüsü anında diske kaydedilir.
+*   **💻 Kurumsal Minimalist Durum Çubuğu (Status Bar):** Kameranın hemen altında yer alan tek satırlık Apple VisionOS stili gösterge paneli. Kamera durumunu, aktif el takibini, yüz ifadesini, kalem modunu ve sistem FPS'ini canlı olarak yansıtır.
+*   **🎨 Sinematik Renk Sınıflandırma & Görüntü Filtreleri:** Canlı yayına ve çekilen fotoğraflara anlık uygulanabilen kurumsal filtreler (*Natural HD, Studio Glow, Warm Cinema, Cyber Cyan, Dramatic B&W, Vivid Pop*).
 
 ---
 
 ## 🛠️ Kullanılan Teknolojiler
 
-*   **Backend:** Python 3.12, Flask, OpenCV (Görüntü İşleme), Multithreading
-*   **AI / Machine Learning:** MediaPipe Tasks API (Hands, Face Landmarker, Object Detector)
-*   **Frontend:** HTML5 (Semantik Arayüz), CSS3 (Modern Glassmorphism, Grid Layout), Vanilla JavaScript
+*   **Backend:** Python 3.12, Flask, OpenCV (Görüntü İşleme), Multithreading (Asenkron İş Parçacıkları)
+*   **AI / Machine Learning:** MediaPipe Tasks API (Hands & Face Landmarker)
+*   **Frontend:** HTML5 (Semantik Arayüz), CSS3 (Modern Glassmorphism, Grid Layout), Vanilla JavaScript (Sıfır bağımlılık)
 
 ---
 
@@ -59,26 +59,26 @@ pip install -r requirements.txt
 ```bash
 python app.py
 ```
-*Uygulama başlatıldığında tarayıcınızda otomatik olarak `http://127.0.0.1:5000` adresi açılacaktır.*
+*Uygulama başlatıldığında tarayıcınızda otomatik olarak `http://127.0.0.1:5000` adresi açılacaktır. Alternatif olarak proje ana dizinindeki `baslat.bat` dosyasına çift tıklayarak da çalıştırabilirsiniz.*
 
 ---
 
 ## 📂 Proje Yapısı
 
 ```text
-├── app.py                  # Flask Sunucusu ve Yapay Zeka İşleme Döngüsü
+├── app.py                  # Flask Sunucusu ve Asenkron Yapay Zeka İşleme Döngüsü
 ├── requirements.txt        # Gerekli Python Paketleri
-├── .gitignore              # Git Takip Dışı Dosya Listesi (venv, modeller, vb.)
-├── README.md               # Proje Açıklama Dosyası
+├── baslat.bat              # Kolay Çalıştırma Scripti (Windows venv uyumlu)
+├── README.md               # Proje Açıklama Dokümanı
 ├── static/
-│   ├── captured/           # Çekilen Fotoğrafların Kaydedildiği Dizin
-│   ├── style.css           # Modern Yüzen/Sabit Panel CSS Tasarımları
-│   └── script.js           # AJAX İstekleri, Lightbox ve Galeri Etkinlikleri
+│   ├── captured/           # Çekilen Sunum Fotoğraflarının Kaydedildiği Dizin
+│   ├── style.css           # Modern Glassmorphic CSS Arayüz Tasarımları
+│   └── script.js           # Telemetri Güncellemeleri, Temassız Hover Takibi, Arayüz Mantığı
 └── templates/
-    └── index.html          # İki Sütunlu Minimalist Arayüz Tasarımı
+    └── index.html          # Minimalist Sunum Sahnesi ve Sidebar Arayüzü
 ```
 
 ---
 
 ## 🛡️ Lisans
-Bu proje eğitim ve kişisel gelişim amacıyla geliştirilmiştir. Ticari olmayan amaçlarla serbestçe kullanılabilir ve geliştirilebilir.
+Bu proje eğitim ve kurumsal sunum geliştirme amacıyla tasarlanmıştır. Serbestçe kullanılabilir ve özelleştirilebilir.
