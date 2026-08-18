@@ -33,6 +33,10 @@ hand_x_history = []
 swipe_event = None
 swipe_time = 0.0
 zoom_factor = 1.0
+pinch_active = False
+initial_pinch_dist = None
+base_zoom_factor = 1.0
+thumbs_up_counter = 0
 
 # Fotoğraf Çekme
 latest_photo_url = None
@@ -54,6 +58,7 @@ drawing_canvas = None
 active_brush_color = (255, 132, 10)  # BGR olarak Tech Blue (#0a84ff)
 active_brush_size = 6
 last_pointer_pos = {}
+smoothed_pointer_pos = {}
 live_canvas_gesture = "Standby"
 
 # Önbellek Verileri
@@ -75,7 +80,7 @@ HAND_CONNECTIONS = [
 
 def init_mediapipe():
     """MediaPipe el, yüz ve nesne modellerini başlat"""
-    global hands_detector, mp_hands, mp_drawing, face_mesh, face_mesh_ready, object_detector, object_detector_ready
+    global hands_detector, mp_hands, mp_drawing, face_mesh, face_mesh_ready
     hands_ready = False
     
     # 1. El Takipçi
@@ -257,11 +262,11 @@ def get_canvas_gesture(finger_states):
     """
     thumb, index, middle, ring, pinky = finger_states
     
-    # Kalem: İşaret parmağı açık, orta/yüzük/serçe kapalı
-    if index and not middle and not ring and not pinky:
+    # Kalem: İşaret parmağı açık; başparmak da dahil diğerleri kapalı
+    if index and not thumb and not middle and not ring and not pinky:
         return "pen"
-    # Lazer İşaretçi: İşaret ve orta parmak açık, yüzük ve serçe kapalı
-    elif index and middle and not ring and not pinky:
+    # Lazer İşaretçi: İşaret ve orta parmak açık; başparmak ve diğerleri kapalı
+    elif index and middle and not thumb and not ring and not pinky:
         return "laser"
     # Silgi: İşaret, orta, yüzük ve serçe parmakların hepsi açık
     elif index and middle and ring and pinky:
@@ -294,6 +299,7 @@ class AsyncAIWorker:
         global current_face_expression, cached_faces, cached_hands
         global live_hand_count, live_total_fingers, live_hand_types, live_face_count
         global thumbs_up_active, hand_x_history, swipe_event, swipe_time, zoom_factor
+        global pinch_active, initial_pinch_dist, base_zoom_factor, thumbs_up_counter
         
         while not self.stopped:
             frame_to_process = None
@@ -428,10 +434,6 @@ class AsyncAIWorker:
                     cached_hands = new_cached_hands
             except Exception:
                 pass
-
-
-
-            # 4. Jestler ve Başparmak Kontrolü
             is_thumbs_up = False
             for hand in new_cached_hands:
                 if hand['fingers'] == 0:
@@ -441,6 +443,11 @@ class AsyncAIWorker:
                             is_thumbs_up = True
                             break
                             
+            if is_thumbs_up:
+                thumbs_up_counter += 1
+            else:
+                thumbs_up_counter = 0
+                
             current_time = time.time()
             if swipe_event and current_time - swipe_time > 1.5:
                 swipe_event = None
@@ -448,25 +455,51 @@ class AsyncAIWorker:
             if new_cached_hands:
                 hand = new_cached_hands[0]
                 landmarks = hand.get('landmarks_px', [])
-                fingers = hand.get('fingers', 0)
+                hand_type = hand.get('type', 'Right')
                 
-                # 1. Kararlı Adım-Tabanlı Zoom Kontrolü (Hava Tuvali aktifken kilitlenir)
+                # 1. Sezgisel Pinch-to-Zoom Kontrolü
                 if air_canvas_enabled:
+                    pinch_active = False
+                    initial_pinch_dist = None
                     if zoom_factor > 1.01:
                         zoom_factor = float(zoom_factor * 0.90 + 1.0 * 0.10)
                     else:
                         zoom_factor = 1.0
                 else:
-                    # 5 parmak açık ise kademeli yakınlaş (Zoom In)
-                    if fingers == 5:
-                        zoom_factor = float(min(1.9, zoom_factor + 0.025))
-                    # Yumruk (0 parmak) ise kademeli uzaklaş (Zoom Out)
-                    elif fingers == 0:
-                        zoom_factor = float(max(1.0, zoom_factor - 0.025))
-                    # Diğer durumlarda (çizim, lazer, bekleme) mevcut zoom değerini koru (Titremeyi engeller)
-                    else:
-                        pass
-                
+                    if len(landmarks) >= 21:
+                        finger_states = get_finger_states(landmarks, hand_type)
+                        thumb, index, middle, ring, pinky = finger_states
+                        is_pinch = thumb and index and not middle and not ring and not pinky
+                        
+                        if is_pinch:
+                            # El boyutunu hesapla (wrist-0 ile middle MCP-9 arası mesafe)
+                            wrist = landmarks[0]
+                            mcp = landmarks[9]
+                            hand_size = np.hypot(wrist[0] - mcp[0], wrist[1] - mcp[1])
+                            if hand_size < 1.0:
+                                hand_size = 1.0
+                                
+                            # Başparmak ucu (4) ile işaret parmağı ucu (8) arası mesafe
+                            thumb_tip = landmarks[4]
+                            index_tip = landmarks[8]
+                            pinch_dist = np.hypot(thumb_tip[0] - index_tip[0], thumb_tip[1] - index_tip[1]) / hand_size
+                            
+                            if not pinch_active:
+                                pinch_active = True
+                                initial_pinch_dist = pinch_dist
+                                base_zoom_factor = zoom_factor
+                            else:
+                                if initial_pinch_dist > 0.01:
+                                    ratio = pinch_dist / initial_pinch_dist
+                                    # Hassasiyet çarpanı: Zoom hızını kontrol eder
+                                    sensitivity = 1.5
+                                    target_zoom = base_zoom_factor + (ratio - 1.0) * sensitivity
+                                    # Pürüzsüz geçiş için üstel filtre
+                                    zoom_factor = float(np.clip(zoom_factor * 0.6 + target_zoom * 0.4, 1.0, 1.9))
+                        else:
+                            pinch_active = False
+                            initial_pinch_dist = None
+                            
                 # 2. Temassız Kaydırma (Swipe) Tespiti
                 if len(landmarks) >= 21:
                     cx = landmarks[9][0]
@@ -483,13 +516,15 @@ class AsyncAIWorker:
                                 hand_x_history.clear()
             else:
                 # El yoksa hızlıca ve pürüzsüzce 1.0x normal boyuta dön
+                pinch_active = False
+                initial_pinch_dist = None
                 if zoom_factor > 1.01:
                     zoom_factor = float(zoom_factor * 0.85 + 1.0 * 0.15)
                 else:
                     zoom_factor = 1.0
-
+                    
             with process_lock:
-                thumbs_up_active = is_thumbs_up
+                thumbs_up_active = (thumbs_up_counter >= 5)
                 live_hand_count = len(new_cached_hands)
                 live_total_fingers = sum(h['fingers'] for h in new_cached_hands)
                 if len(new_cached_hands) == 1:
@@ -512,7 +547,6 @@ def draw_overlays(frame):
     with process_lock:
         local_hands = list(cached_hands)
         local_faces = list(cached_faces)
-        local_objects = list(cached_objects)
 
     # 1. Yüz Biyometrik Vizörleri
     for face in local_faces:
@@ -598,37 +632,67 @@ def draw_overlays(frame):
                 ix, iy = px[8] # İşaret parmağı ucu
                 mx, my = px[9] # Silgi için avuç içi (orta parmak mcp)
                 
+                # İmleç (İşaret parmağı ucu) için Dinamik EMA Pürüzsüzleştirme
+                prev_smoothed = smoothed_pointer_pos.get(hand_type)
+                if prev_smoothed is None:
+                    six, siy = ix, iy
+                else:
+                    dx = ix - prev_smoothed[0]
+                    dy = iy - prev_smoothed[1]
+                    dist = np.hypot(dx, dy)
+                    
+                    # Dinamik alpha: yavaş hareketlerde daha pürüzsüz (küçük alpha), hızlı hareketlerde tepkisel (büyük alpha)
+                    alpha = max(0.15, min(0.75, dist / 90.0))
+                    six = int(prev_smoothed[0] + alpha * dx)
+                    siy = int(prev_smoothed[1] + alpha * dy)
+                
+                smoothed_pointer_pos[hand_type] = (six, siy)
+                
+                # Silgi koordinatları için Dinamik EMA Pürüzsüzleştirme
+                prev_smoothed_eraser = smoothed_pointer_pos.get(hand_type + "_eraser")
+                if prev_smoothed_eraser is None:
+                    smx, smy = mx, my
+                else:
+                    dx = mx - prev_smoothed_eraser[0]
+                    dy = my - prev_smoothed_eraser[1]
+                    dist = np.hypot(dx, dy)
+                    alpha = max(0.15, min(0.75, dist / 90.0))
+                    smx = int(prev_smoothed_eraser[0] + alpha * dx)
+                    smy = int(prev_smoothed_eraser[1] + alpha * dy)
+                    
+                smoothed_pointer_pos[hand_type + "_eraser"] = (smx, smy)
+                
                 if gesture == "pen":
                     active_gesture = "Kalem Modu"
                     last_pos = last_pointer_pos.get(hand_type)
                     if last_pos is not None:
-                        dist = np.hypot(ix - last_pos[0], iy - last_pos[1])
+                        dist = np.hypot(six - last_pos[0], siy - last_pos[1])
                         if dist < 120:
-                            cv2.line(drawing_canvas, last_pos, (ix, iy), active_brush_color, active_brush_size, cv2.LINE_AA)
-                    last_pointer_pos[hand_type] = (ix, iy)
+                            cv2.line(drawing_canvas, last_pos, (six, siy), active_brush_color, active_brush_size, cv2.LINE_AA)
+                    last_pointer_pos[hand_type] = (six, siy)
                     
                     # Kalem ucu görselleştirme (kamera karesine geçici olarak çizilir)
-                    cv2.circle(frame, (ix, iy), active_brush_size + 2, (255, 255, 255), -1, cv2.LINE_AA)
-                    cv2.circle(frame, (ix, iy), active_brush_size, active_brush_color, -1, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), active_brush_size + 2, (255, 255, 255), -1, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), active_brush_size, active_brush_color, -1, cv2.LINE_AA)
                     
                 elif gesture == "eraser":
                     active_gesture = "Silgi"
                     eraser_radius = 45
-                    cv2.circle(drawing_canvas, (mx, my), eraser_radius, (0, 0, 0), -1)
+                    cv2.circle(drawing_canvas, (smx, smy), eraser_radius, (0, 0, 0), -1)
                     
                     # Ekrana geçici silgi halkası çizelim
-                    cv2.circle(frame, (mx, my), eraser_radius, (255, 255, 255), 2, cv2.LINE_AA)
-                    cv2.circle(frame, (mx, my), eraser_radius + 4, (100, 100, 100), 1, cv2.LINE_AA)
-                    cv2.putText(frame, "SILGI", (mx - 20, my + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                    cv2.circle(frame, (smx, smy), eraser_radius, (255, 255, 255), 2, cv2.LINE_AA)
+                    cv2.circle(frame, (smx, smy), eraser_radius + 4, (100, 100, 100), 1, cv2.LINE_AA)
+                    cv2.putText(frame, "SILGI", (smx - 20, smy + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
                     
                     last_pointer_pos[hand_type] = None
                     
                 elif gesture == "laser":
                     active_gesture = "Lazer İşaretçi"
                     # Lazer parlama efekti (geçiçi)
-                    cv2.circle(frame, (ix, iy), 12, (0, 0, 255), 2, cv2.LINE_AA)
-                    cv2.circle(frame, (ix, iy), 6, (0, 0, 255), -1, cv2.LINE_AA)
-                    cv2.circle(frame, (ix, iy), 2, (255, 255, 255), -1, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), 12, (0, 0, 255), 2, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), 6, (0, 0, 255), -1, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), 2, (255, 255, 255), -1, cv2.LINE_AA)
                     
                     last_pointer_pos[hand_type] = None
                     
@@ -637,10 +701,11 @@ def draw_overlays(frame):
                     last_pointer_pos[hand_type] = None
                     
                     # İnce bir hedefleme halkası gösterelim
-                    cv2.circle(frame, (ix, iy), 5, (255, 255, 255), 1, cv2.LINE_AA)
-                    cv2.circle(frame, (ix, iy), 2, (180, 180, 180), -1, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), 5, (255, 255, 255), 1, cv2.LINE_AA)
+                    cv2.circle(frame, (six, siy), 2, (180, 180, 180), -1, cv2.LINE_AA)
     else:
         last_pointer_pos.clear()
+        smoothed_pointer_pos.clear()
         
     live_canvas_gesture = active_gesture
 
@@ -702,7 +767,11 @@ def stats():
         local_hands = list(cached_hands)
     if air_canvas_enabled and len(local_hands) > 0:
         hand = local_hands[0]
-        if 'landmarks_px' in hand and len(hand['landmarks_px']) >= 21:
+        hand_type = hand['type']
+        smoothed_pos = smoothed_pointer_pos.get(hand_type)
+        if smoothed_pos is not None:
+            ptr_x, ptr_y = smoothed_pos
+        elif 'landmarks_px' in hand and len(hand['landmarks_px']) >= 21:
             ptr_x, ptr_y = hand['landmarks_px'][8]
             
     return {
